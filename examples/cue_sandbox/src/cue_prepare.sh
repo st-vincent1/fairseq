@@ -42,21 +42,25 @@ if [ ! -f $DATA/train.bpe.${SRC} ]; then
             --min-len $TRAIN_MINLEN --max-len $TRAIN_MAXLEN
 
 
-        echo "encoding dev with learned BPE..."
-        python "$SPM_ENCODE" \
-            --model "$DATA/spm.bpe.model" \
-            --output_format=piece \
-            --inputs $DATA/dev.${SRC} $DATA/dev.${TGT} \
-            --outputs $DATA/dev.bpe.${SRC} $DATA/dev.bpe.${TGT}
+        echo "encoding dev/test with learned BPE..."
+        for SPLIT in dev tst-COMMON; do
+          python "$SPM_ENCODE" \
+              --model "$DATA/spm.bpe.model" \
+              --output_format=piece \
+              --inputs $DATA/${SPLIT}.${SRC} $DATA/${SPLIT}.${TGT} \
+              --outputs $DATA/${SPLIT}.bpe.${SRC} $DATA/${SPLIT}.bpe.${TGT}
+        done
 fi
 
 # BINARIZE DATA
 fairseq-preprocess --source-lang ${SRC} --target-lang ${TGT} \
     --trainpref $DATA/train.bpe \
     --validpref $DATA/dev.bpe \
+    --testpref $DATA/tst-COMMON.bpe \
     --destdir ${DEST} \
     --workers 10
 
 # Move cls embeddings to data-bin/
 cp examples/cue_sandbox/data/dev.pkl ${DEST}/valid.${SRC}-${TGT}.pkl
+cp examples/cue_sandbox/data/tst-COMMON.pkl ${DEST}/test.${SRC}-${TGT}.pkl
 cp examples/cue_sandbox/data/train.pkl ${DEST}/train.${SRC}-${TGT}.pkl

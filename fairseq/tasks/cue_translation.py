@@ -93,7 +93,7 @@ def load_cue_dataset(
 
     import pickle
     with open(prefix + 'pkl', 'rb') as pkl_file:
-        cls_embeddings = pickle.load(pkl_file)['cxt']
+        cls_embeddings = pickle.load(pkl_file)['cxt'].to('cpu')
         logger.info(f"Loaded context embeddings from pickle file.")
 
     if prepend_bos:

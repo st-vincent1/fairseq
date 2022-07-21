@@ -257,13 +257,11 @@ class CUEConfig(FairseqDataclass):
         copy the prefixed keys (decoder_embed_dim) to the DC fields: decoder.embed_dim
         """
         cfg = cls()
-        print("Copying keys")
         for fld in fields(cls):
             # for all the fields in the DC, find the fields (e.g. embed_dim)
             # in the namespace with the prefix (e.g. decoder)
             # and set it on the dc.
             args_key = f"{prefix}_{fld.name}"
-            print(args_key, fld.name)
             if safe_hasattr(args, args_key):
                 seen.add(args_key)
                 setattr(cfg, fld.name, safe_getattr(args, args_key))

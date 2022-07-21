@@ -5,8 +5,8 @@ SEED=1
 mkdir -p logs
 
 mkdir -p ${CKPT}
-CUDA_VISIBLE_DEVICES=0 fairseq-train data-bin/cue.en.de.bpe8k/ \
-    --max-update 20000 \
+CUDA_VISIBLE_DEVICES=0,1 fairseq-train data-bin/cue.en.de.bpe8k/ \
+    --max-update 50000 \
     --ddp-backend=legacy_ddp \
     --task cue_translation \
     --arch cue_transformer_base \
@@ -16,7 +16,7 @@ CUDA_VISIBLE_DEVICES=0 fairseq-train data-bin/cue.en.de.bpe8k/ \
     --warmup-updates 4000 --warmup-init-lr '1e-07' \
     --label-smoothing 0.1 --criterion label_smoothed_cross_entropy \
     --dropout 0.3 --weight-decay 0.0001 \
-    --save-interval-updates 1500 \
+    --save-interval-updates 5000 \
     --no-epoch-checkpoints \
     --save-dir ${CKPT} \
     --max-tokens 1000 \
