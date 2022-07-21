@@ -73,7 +73,6 @@ def collate(
     src_lengths, sort_order = src_lengths.sort(descending=True)
     id = id.index_select(0, sort_order)
     src_tokens = src_tokens.index_select(0, sort_order)
-
     cxt_vectors = torch.cat([s["context"].unsqueeze(0) for s in samples])
     # sort samples by descending number of frames
     cxt_vectors = cxt_vectors.index_select(0, sort_order)
