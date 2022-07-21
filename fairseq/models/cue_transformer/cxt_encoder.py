@@ -53,9 +53,9 @@ class ContextEncoderBase(FairseqEncoder):
         embed_tokens (torch.nn.Embedding): input embedding
     """
 
-    def __init__(self, cfg, dictionary, embed_tokens, return_fc=False):
+    def __init__(self, cfg, return_fc=False):
         self.cfg = cfg
-        super().__init__(dictionary)
+        super().__init__(dictionary=None)
         self.register_buffer("version", torch.Tensor([3]))
 
         self.dropout_module = FairseqDropout(
@@ -64,14 +64,12 @@ class ContextEncoderBase(FairseqEncoder):
         self.cxt_encoder_layerdrop = cfg.cxt_encoder.layerdrop
         self.return_fc = return_fc
 
-        embed_dim = embed_tokens.embedding_dim
-        self.padding_idx = embed_tokens.padding_idx
+        embed_dim = 512
+        self.padding_idx = 0
         self.max_source_positions = cfg.max_source_positions
 
-        self.embed_tokens = embed_tokens
         self.lin_proj = nn.Linear(cfg.cls_dim, embed_dim, bias=False)
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
-
 
         if cfg.layernorm_embedding:
             self.layernorm_embedding = LayerNorm(embed_dim, export=cfg.export)
@@ -130,7 +128,6 @@ class ContextEncoderBase(FairseqEncoder):
     def forward(
         self,
         cxt_vectors,
-        cxt_lengths: Optional[torch.Tensor] = None,
         return_all_hiddens: bool = False
     ):
         """
@@ -155,7 +152,7 @@ class ContextEncoderBase(FairseqEncoder):
                   Only populated if *return_all_hiddens* is True.
         """
         return self.forward_scriptable(
-            cxt_vectors, cxt_lengths, return_all_hiddens
+            cxt_vectors, return_all_hiddens
         )
 
     # TorchScript doesn't support super() method so that the scriptable Subclass
@@ -165,7 +162,6 @@ class ContextEncoderBase(FairseqEncoder):
     def forward_scriptable(
         self,
         cxt_vectors,
-        cxt_lengths: Optional[torch.Tensor] = None,
         return_all_hiddens: bool = False
     ):
         """
@@ -190,11 +186,11 @@ class ContextEncoderBase(FairseqEncoder):
                   Only populated if *return_all_hiddens* is True.
         """
         # compute padding mask
-        cxt_encoder_padding_mask = cxt_vectors.eq(self.padding_idx)
+        cxt_encoder_padding_mask = torch.sum(cxt_vectors, dim=-1).eq(self.padding_idx)
+
         has_pads = cxt_vectors.device.type == "xla" or cxt_encoder_padding_mask.any()
 
         x, cxt_encoder_embedding = self.forward_embedding(cxt_vectors)
-
         # account for padding while computing the representation
         if has_pads:
             x = x * (1 - cxt_encoder_padding_mask.unsqueeze(-1).type_as(x))
@@ -280,7 +276,7 @@ class ContextEncoderBase(FairseqEncoder):
             processing_mask = cxt_encoder_padding_mask
         cxt_encoder_padding_mask_out = processing_mask if has_pads else None
         for layer in self.layers:
-            lr = layer(x, cxt_encoder_padding_mask=cxt_encoder_padding_mask_out)
+            lr = layer(x, encoder_padding_mask=cxt_encoder_padding_mask_out)
 
             if isinstance(lr, tuple) and len(lr) == 2:
                 x, fc_result = lr
@@ -307,12 +303,12 @@ class ContextEncoderBase(FairseqEncoder):
         # `forward` so we use a dictionary instead.
         # TorchScript does not support mixed values so the values are all lists.
         # The empty list is equivalent to None.
-        cxt_lengths = (
-            cxt_vectors.ne(self.padding_idx)
-            .sum(dim=1, dtype=torch.int32)
-            .reshape(-1, 1)
-            .contiguous()
-        )
+        # cxt_lengths = (
+        #     cxt_vectors.ne(self.padding_idx)
+        #     .sum(dim=1, dtype=torch.int32)
+        #     .reshape(-1, 1)
+        #     .contiguous()
+        # )
         return {
             "cxt_encoder_out": [x],  # T x B x C
             "cxt_encoder_padding_mask": [cxt_encoder_padding_mask],  # B x T
@@ -320,7 +316,7 @@ class ContextEncoderBase(FairseqEncoder):
             "cxt_encoder_states": cxt_encoder_states,  # List[T x B x C]
             "fc_results": fc_results,  # List[T x B x C]
             "cxt_vectors": cxt_vectors,  # B x T x E
-            "cxt_lengths": cxt_lengths,  # B x 1
+            # "cxt_lengths": cxt_lengths,  # B x 1
         }
 
     @torch.jit.export
@@ -357,10 +353,10 @@ class ContextEncoderBase(FairseqEncoder):
         else:
             cxt_vectors = [(cxt_encoder_out["cxt_vectors"][0]).index_select(0, new_order)]
 
-        if len(cxt_encoder_out["cxt_lengths"]) == 0:
-            cxt_lengths = []
-        else:
-            cxt_lengths = [(cxt_encoder_out["cxt_lengths"][0]).index_select(0, new_order)]
+        # if len(cxt_encoder_out["cxt_lengths"]) == 0:
+        #     cxt_lengths = []
+        # else:
+        #     cxt_lengths = [(cxt_encoder_out["cxt_lengths"][0]).index_select(0, new_order)]
 
         cxt_encoder_states = cxt_encoder_out["cxt_encoder_states"]
         if len(cxt_encoder_states) > 0:
@@ -373,7 +369,7 @@ class ContextEncoderBase(FairseqEncoder):
             "cxt_encoder_embedding": new_cxt_encoder_embedding,  # B x T x C
             "cxt_encoder_states": cxt_encoder_states,  # List[T x B x C]
             "cxt_vectors": cxt_vectors,  # B x T
-            "cxt_lengths": cxt_lengths,  # B x 1
+            # "cxt_lengths": cxt_lengths,  # B x 1
         }
 
     @torch.jit.export
@@ -389,14 +385,6 @@ class ContextEncoderBase(FairseqEncoder):
 
     def upgrade_state_dict_named(self, state_dict, name):
         """Upgrade a (possibly old) state dict for new versions of fairseq."""
-        if isinstance(self.embed_positions, SinusoidalPositionalEmbedding):
-            weights_key = "{}.embed_positions.weights".format(name)
-            if weights_key in state_dict:
-                print("deleting {0}".format(weights_key))
-                del state_dict[weights_key]
-            state_dict[
-                "{}.embed_positions._float_tensor".format(name)
-            ] = torch.FloatTensor(1)
         for i in range(self.num_layers):
             # update layer norms
             self.layers[i].upgrade_state_dict_named(

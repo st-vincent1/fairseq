@@ -33,7 +33,7 @@ class ContextEmbedding():
 
             # resize buffer
             if all_embeddings.nelement() == 0:
-                all_embeddings = torch.empty([0, len(sentences), 768])
+                all_embeddings = torch.empty([len(sentences), 0, 768])
 
             # buffer for embeddings
             cls_embeddings = torch.empty([0, 768])
@@ -50,6 +50,7 @@ class ContextEmbedding():
                     # Get last hidden states of model and then extract the cls embedding ([0][:,0,:])
                     cls = self.model(encoded_input['input_ids'],
                                      attention_mask=encoded_input['attention_mask'])[0][:, 0, :]
+
                     # nullify matrices where no context given
                     try:
                         cls = cls.index_fill_(0, indices, 0)
@@ -58,7 +59,7 @@ class ContextEmbedding():
 
                 cls_embeddings = torch.cat((cls_embeddings, cls))
 
-            all_embeddings = torch.cat((all_embeddings, cls_embeddings.unsqueeze(0)))
+            all_embeddings = torch.cat((all_embeddings, cls_embeddings.unsqueeze(1)), dim=1)
         return all_embeddings
 
 

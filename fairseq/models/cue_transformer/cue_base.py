@@ -56,8 +56,10 @@ class DoubleEncoderDecoderModel(BaseFairseqModel):
         check_type(self.src_encoder, FairseqEncoder)
         check_type(self.decoder, FairseqDecoder)
 
-    def forward(self, cxt_tokens, cxt_lengths, src_tokens, src_lengths, prev_output_tokens, **kwargs):
-        cxt_encoder_out = self.encoder(cxt_tokens, cxt_lengths=cxt_lengths, **kwargs)
+    # deleted cxt_lengths
+    def forward(self, cxt_vectors, src_tokens, src_lengths, prev_output_tokens, **kwargs):
+        # cxt_encoder_out = self.encoder(cxt_vectors, cxt_lengths=cxt_lengths, **kwargs)
+        cxt_encoder_out = self.encoder(cxt_vectors, **kwargs)
         src_encoder_out = self.encoder(src_tokens, src_lengths=src_lengths, **kwargs)
         decoder_out = self.decoder(
             prev_output_tokens, cxt_encoder_out=cxt_encoder_out, src_encoder_out=src_encoder_out, **kwargs
@@ -67,7 +69,8 @@ class DoubleEncoderDecoderModel(BaseFairseqModel):
     def forward_decoder(self, prev_output_tokens, **kwargs):
         return self.decoder(prev_output_tokens, **kwargs)
 
-    def extract_features(self, cxt_tokens, cxt_lengths, src_tokens, src_lengths, prev_output_tokens, **kwargs):
+    # deleted lengths
+    def extract_features(self, cxt_vectors, src_tokens, src_lengths, prev_output_tokens, **kwargs):
         """
         Similar to *forward* but only return features.
 
@@ -76,7 +79,8 @@ class DoubleEncoderDecoderModel(BaseFairseqModel):
                 - the decoder's features of shape `(batch, tgt_len, embed_dim)`
                 - a dictionary with any model-specific outputs
         """
-        cxt_encoder_out = self.encoder(cxt_tokens, cxt_lengths=cxt_lengths, **kwargs)
+        # cxt_encoder_out = self.encoder(cxt_vectors, cxt_lengths=cxt_lengths, **kwargs)
+        cxt_encoder_out = self.encoder(cxt_vectors, **kwargs)
         src_encoder_out = self.encoder(src_tokens, src_lengths=src_lengths, **kwargs)
         features = self.decoder.extract_features(
             prev_output_tokens, cxt_encoder_out=cxt_encoder_out, src_encoder_out=src_encoder_out, **kwargs
@@ -148,10 +152,10 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         if cfg.decoder.layers_to_keep:
             cfg.decoder.layers = len(cfg.decoder.layers_to_keep.split(","))
 
-        cxt_dict, src_dict, tgt_dict = task.source_dictionary, task.source_dictionary, task.target_dictionary
+        src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
 
         if cfg.share_all_embeddings:
-            if cxt_dict != src_dict and src_dict != tgt_dict:
+            if src_dict != tgt_dict:
                 raise ValueError("--share-all-embeddings requires a joined dictionary")
             if cfg.cxt_encoder.embed_dim != cfg.src_encoder.embed_dim \
                     and cfg.src_encoder.embed_dim != cfg.decoder.embed_dim:
@@ -169,13 +173,9 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
             src_encoder_embed_tokens = cls.build_embedding(
                 cfg, src_dict, cfg.src_encoder.embed_dim, cfg.src_encoder.embed_path
             )
-            cxt_encoder_embed_tokens = src_encoder_embed_tokens
             decoder_embed_tokens = src_encoder_embed_tokens
             cfg.share_decoder_input_output_embed = True
         else:
-            cxt_encoder_embed_tokens = cls.build_embedding(
-                cfg, cxt_dict, cfg.cxt_encoder.embed_dim, cfg.cxt_encoder.embed_path
-            )
             src_encoder_embed_tokens = cls.build_embedding(
                 cfg, src_dict, cfg.src_encoder.embed_dim, cfg.src_encoder.embed_path
             )
@@ -184,7 +184,7 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
             )
         if cfg.offload_activations:
             cfg.checkpoint_activations = True  # offloading implies checkpointing
-        cxt_encoder = cls.build_cxt_encoder(cfg, cxt_dict, cxt_encoder_embed_tokens)
+        cxt_encoder = cls.build_cxt_encoder(cfg)
         src_encoder = cls.build_source_encoder(cfg, src_dict, src_encoder_embed_tokens)
         decoder = cls.build_decoder(cfg, tgt_dict, decoder_embed_tokens)
         return cls(cfg, cxt_encoder, src_encoder, decoder)
@@ -202,8 +202,8 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         return emb
 
     @classmethod
-    def build_cxt_encoder(cls, cfg, cxt_dict, embed_tokens):
-        return ContextEncoderBase(cfg, cxt_dict, embed_tokens)
+    def build_cxt_encoder(cls, cfg):
+        return ContextEncoderBase(cfg)
 
     @classmethod
     def build_source_encoder(cls, cfg, src_dict, embed_tokens):
@@ -223,8 +223,8 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
     # Current workaround is to add union of all arguments in child classes.
     def forward(
             self,
-            cxt_tokens,
-            cxt_lengths,
+            cxt_vectors,
+            # cxt_lengths,
             src_tokens,
             src_lengths,
             prev_output_tokens,
@@ -243,7 +243,8 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         which are not supported by TorchScript.
         """
         cxt_encoder_out = self.cxt_encoder(
-            cxt_tokens=cxt_tokens, cxt_lengths=cxt_lengths,
+            # cxt_vectors=cxt_vectors, cxt_lengths=cxt_lengths,
+            cxt_vectors=cxt_vectors,
             return_all_hiddens=return_all_hiddens
         )
         src_encoder_out = self.src_encoder(
@@ -253,6 +254,8 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         if context_inclusion == 'add-encoder-outputs':
             # currently only supported option
             encoder_out = cxt_encoder_out + src_encoder_out
+        else:
+            encoder_out = src_encoder_out
         # Need to figure out what "prev_output_tokens" is during inference.
         # During training, I could simply replace
         decoder_out = self.decoder(

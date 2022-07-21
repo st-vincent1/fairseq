@@ -23,7 +23,7 @@ from fairseq.data import (
 from fairseq.data.indexed_dataset import get_available_dataset_impl
 from fairseq.dataclass import ChoiceEnum, FairseqDataclass
 from fairseq.tasks import FairseqTask, register_task
-
+from fairseq.tasks.translation import TranslationConfig, TranslationTask
 
 EVAL_BLEU_ORDER = 4
 
@@ -91,24 +91,10 @@ def load_cue_dataset(
         prefix + tgt, tgt_dict, dataset_impl
     )
 
-    """todo
-    load context dataset from pickle
-    needs to define cxt_dataset_sizes (*ndarray, I think this is size of each sample.)
-    check for other properties
-    
-    for now this works for 1 context
-    """
     import pickle
     with open(prefix + 'pkl', 'rb') as pkl_file:
-        cls_embeddings = pickle.load(pkl_file)
+        cls_embeddings = pickle.load(pkl_file)['cxt']
         logger.info(f"Loaded context embeddings from pickle file.")
-
-    # # cxt_dataset = np.array(load_from_pickle)
-    # # cxt_dataset_sizes = np.array(cxt_dataset.size(0))
-    # cxt_dataset = data_utils.load_indexed_dataset(
-    #     prefix + "cxt", None, dataset_impl
-    # )
-
 
     if prepend_bos:
         assert hasattr(src_dict, "bos_index") and hasattr(tgt_dict, "bos_index")
@@ -158,124 +144,21 @@ def load_cue_dataset(
 
 
 @dataclass
-class CueConfig(FairseqDataclass):
-    data: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "colon separated path to data directories list, will be iterated upon during epochs "
-            "in round-robin manner; however, valid and test data are always in the first directory "
-            "to avoid the need for repeating them in all directories"
-        },
-    )
-    source_lang: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "source language",
-            "argparse_alias": "-s",
-        },
-    )
-    target_lang: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "target language",
-            "argparse_alias": "-t",
-        },
-    )
-    load_alignments: bool = field(
-        default=False, metadata={"help": "load the binarized alignments"}
-    )
-    left_pad_source: bool = field(
-        default=True, metadata={"help": "pad the source on the left"}
-    )
-    left_pad_target: bool = field(
-        default=False, metadata={"help": "pad the target on the left"}
-    )
-    max_source_positions: int = field(
-        default=1024, metadata={"help": "max number of tokens in the source sequence"}
-    )
-    max_target_positions: int = field(
-        default=1024, metadata={"help": "max number of tokens in the target sequence"}
-    )
-    upsample_primary: int = field(
-        default=-1, metadata={"help": "the amount of upsample primary dataset"}
-    )
-    truncate_source: bool = field(
-        default=False, metadata={"help": "truncate source to max-source-positions"}
-    )
-    num_batch_buckets: int = field(
-        default=0,
-        metadata={
-            "help": "if >0, then bucket source and target lengths into "
-            "N buckets and pad accordingly; this is useful on TPUs to minimize the number of compilations"
-        },
-    )
-    train_subset: str = II("dataset.train_subset")
-    dataset_impl: Optional[ChoiceEnum(get_available_dataset_impl())] = II(
-        "dataset.dataset_impl"
-    )
-    required_seq_len_multiple: int = II("dataset.required_seq_len_multiple")
-
-    # options for reporting BLEU during validation
-    eval_bleu: bool = field(
-        default=False, metadata={"help": "evaluation with BLEU scores"}
-    )
-    eval_bleu_args: Optional[str] = field(
-        default="{}",
-        metadata={
-            "help": 'generation args for BLUE scoring, e.g., \'{"beam": 4, "lenpen": 0.6}\', as JSON string'
-        },
-    )
-    eval_bleu_detok: str = field(
-        default="space",
-        metadata={
-            "help": "detokenize before computing BLEU (e.g., 'moses'); required if using --eval-bleu; "
-            "use 'space' to disable detokenization; see fairseq.data.encoders for other options"
-        },
-    )
-    eval_bleu_detok_args: Optional[str] = field(
-        default="{}",
-        metadata={"help": "args for building the tokenizer, if needed, as JSON string"},
-    )
-    eval_tokenized_bleu: bool = field(
-        default=False, metadata={"help": "compute tokenized BLEU instead of sacrebleu"}
-    )
-    eval_bleu_remove_bpe: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "remove BPE before computing BLEU",
-            "argparse_const": "@@ ",
-        },
-    )
-    eval_bleu_print_samples: bool = field(
-        default=False, metadata={"help": "print sample generations during validation"}
-    )
+class CueConfig(TranslationConfig):
+    """Copied config from Translation task. New arguments can be added below."""
+    pass
 
 
 @register_task("cue_translation", dataclass=CueConfig)
-class CueTranslationTask(FairseqTask):
-    """
-    Translate from one (source) language to another (target) language.
-
-    Args:
-        src_dict (~fairseq.data.Dictionary): dictionary for the source language
-        tgt_dict (~fairseq.data.Dictionary): dictionary for the target language
-
-    .. note::
-
-        The translation task is compatible with :mod:`fairseq-train`,
-        :mod:`fairseq-generate` and :mod:`fairseq-interactive`.
-    """
-
+class CueTranslationTask(TranslationTask):
     cfg: CueConfig
 
-    def __init__(self, cfg: CueConfig, src_dict, tgt_dict):
-        super().__init__(cfg)
-        self.src_dict = src_dict
-        self.tgt_dict = tgt_dict
 
     @classmethod
     def setup_task(cls, cfg: CueConfig, **kwargs):
         """Setup the task (e.g., load dictionaries).
+
+        Overwriting since cfg is different
 
         Args:
             args (argparse.Namespace): parsed command-line arguments
@@ -308,6 +191,8 @@ class CueTranslationTask(FairseqTask):
 
     def load_dataset(self, split, epoch=1, combine=False, **kwargs):
         """Load a given dataset split.
+
+        Overwriting to use a different function for loading dataset
 
         Args:
             split (str): name of the split (e.g., train, valid, test)
@@ -343,144 +228,13 @@ class CueTranslationTask(FairseqTask):
             pad_to_multiple=self.cfg.required_seq_len_multiple,
         )
 
-    def build_dataset_for_inference(self, cxt_vectors, cxt_sizes, src_tokens, src_lengths, constraints=None):
+    def build_dataset_for_inference(self, cxt_vectors, src_tokens, src_lengths, constraints=None):
+        """Builds dataset without targets. Overwriting due to inclusion of cxt_vectors"""
         return CueDataset(
             cxt_vectors,
-            cxt_sizes,
             src_tokens,
             src_lengths,
             self.source_dictionary,
             tgt_dict=self.target_dictionary,
             constraints=constraints,
         )
-
-    def build_model(self, cfg, from_checkpoint=False):
-        model = super().build_model(cfg, from_checkpoint)
-        if self.cfg.eval_bleu:
-            detok_args = json.loads(self.cfg.eval_bleu_detok_args)
-            self.tokenizer = encoders.build_tokenizer(
-                Namespace(tokenizer=self.cfg.eval_bleu_detok, **detok_args)
-            )
-
-            gen_args = json.loads(self.cfg.eval_bleu_args)
-            self.sequence_generator = self.build_generator(
-                [model], Namespace(**gen_args)
-            )
-        return model
-
-    def valid_step(self, sample, model, criterion):
-        loss, sample_size, logging_output = super().valid_step(sample, model, criterion)
-        if self.cfg.eval_bleu:
-            bleu = self._inference_with_bleu(self.sequence_generator, sample, model)
-            logging_output["_bleu_sys_len"] = bleu.sys_len
-            logging_output["_bleu_ref_len"] = bleu.ref_len
-            # we split counts into separate entries so that they can be
-            # summed efficiently across workers using fast-stat-sync
-            assert len(bleu.counts) == EVAL_BLEU_ORDER
-            for i in range(EVAL_BLEU_ORDER):
-                logging_output["_bleu_counts_" + str(i)] = bleu.counts[i]
-                logging_output["_bleu_totals_" + str(i)] = bleu.totals[i]
-        return loss, sample_size, logging_output
-
-    def reduce_metrics(self, logging_outputs, criterion):
-        super().reduce_metrics(logging_outputs, criterion)
-        if self.cfg.eval_bleu:
-
-            def sum_logs(key):
-                import torch
-
-                result = sum(log.get(key, 0) for log in logging_outputs)
-                if torch.is_tensor(result):
-                    result = result.cpu()
-                return result
-
-            counts, totals = [], []
-            for i in range(EVAL_BLEU_ORDER):
-                counts.append(sum_logs("_bleu_counts_" + str(i)))
-                totals.append(sum_logs("_bleu_totals_" + str(i)))
-
-            if max(totals) > 0:
-                # log counts as numpy arrays -- log_scalar will sum them correctly
-                metrics.log_scalar("_bleu_counts", np.array(counts))
-                metrics.log_scalar("_bleu_totals", np.array(totals))
-                metrics.log_scalar("_bleu_sys_len", sum_logs("_bleu_sys_len"))
-                metrics.log_scalar("_bleu_ref_len", sum_logs("_bleu_ref_len"))
-
-                def compute_bleu(meters):
-                    import inspect
-
-                    try:
-                        from sacrebleu.metrics import BLEU
-
-                        comp_bleu = BLEU.compute_bleu
-                    except ImportError:
-                        # compatibility API for sacrebleu 1.x
-                        import sacrebleu
-
-                        comp_bleu = sacrebleu.compute_bleu
-
-                    fn_sig = inspect.getfullargspec(comp_bleu)[0]
-                    if "smooth_method" in fn_sig:
-                        smooth = {"smooth_method": "exp"}
-                    else:
-                        smooth = {"smooth": "exp"}
-                    bleu = comp_bleu(
-                        correct=meters["_bleu_counts"].sum,
-                        total=meters["_bleu_totals"].sum,
-                        sys_len=int(meters["_bleu_sys_len"].sum),
-                        ref_len=int(meters["_bleu_ref_len"].sum),
-                        **smooth,
-                    )
-                    return round(bleu.score, 2)
-
-                metrics.log_derived("bleu", compute_bleu)
-
-    def max_positions(self):
-        """Return the max sentence length allowed by the task."""
-        return (self.cfg.max_source_positions, self.cfg.max_target_positions)
-
-    @property
-    def source_dictionary(self):
-        """Return the source :class:`~fairseq.data.Dictionary`."""
-        return self.src_dict
-
-    @property
-    def target_dictionary(self):
-        """Return the target :class:`~fairseq.data.Dictionary`."""
-        return self.tgt_dict
-
-    def _inference_with_bleu(self, generator, sample, model):
-        import sacrebleu
-
-        def decode(toks, escape_unk=False):
-            s = self.tgt_dict.string(
-                toks.int().cpu(),
-                self.cfg.eval_bleu_remove_bpe,
-                # The default unknown string in fairseq is `<unk>`, but
-                # this is tokenized by sacrebleu as `< unk >`, inflating
-                # BLEU scores. Instead, we use a somewhat more verbose
-                # alternative that is unlikely to appear in the real
-                # reference, but doesn't get split into multiple tokens.
-                unk_string=("UNKNOWNTOKENINREF" if escape_unk else "UNKNOWNTOKENINHYP"),
-            )
-            if self.tokenizer:
-                s = self.tokenizer.decode(s)
-            return s
-
-        gen_out = self.inference_step(generator, [model], sample, prefix_tokens=None)
-        hyps, refs = [], []
-        for i in range(len(gen_out)):
-            hyps.append(decode(gen_out[i][0]["tokens"]))
-            refs.append(
-                decode(
-                    utils.strip_pad(sample["target"][i], self.tgt_dict.pad()),
-                    escape_unk=True,  # don't count <unk> as matches to the hypo
-                )
-            )
-        if self.cfg.eval_bleu_print_samples:
-            logger.info("example hypothesis: " + hyps[0])
-            logger.info("example reference: " + refs[0])
-        if self.cfg.eval_tokenized_bleu:
-            return sacrebleu.corpus_bleu(hyps, [refs], tokenize="none")
-        else:
-            return sacrebleu.corpus_bleu(hyps, [refs])

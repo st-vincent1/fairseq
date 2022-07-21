@@ -22,10 +22,7 @@ def collate(
     if len(samples) == 0:
         return {}
 
-    def merge(
-            key, # key = e.g. "source", used to extract tensors
-            left_pad, # are we padding to left?
-            move_eos_to_beginning=False, pad_to_length=None):
+    def merge(key, left_pad, move_eos_to_beginning=False, pad_to_length=None):
         return data_utils.collate_tokens(
             [s[key] for s in samples],
             pad_idx,
@@ -63,14 +60,13 @@ def collate(
         align_weights = align_tgt_c[align_tgt_i[np.arange(len(align_tgt))]]
         return 1.0 / align_weights.float()
 
-    id = torch.LongTensor([s["id"] for s in samples]) # id stores ids of samples in the given batch
-    # pad src tokens
+    id = torch.LongTensor([s["id"] for s in samples])
     src_tokens = merge(
         "source",
         left_pad=left_pad_source,
         pad_to_length=pad_to_length["source"] if pad_to_length is not None else None,
     )
-    # sort by descending source length - does not include pad idx in the counts
+    # sort by descending source length
     src_lengths = torch.LongTensor(
         [s["source"].ne(pad_idx).long().sum() for s in samples]
     )
@@ -78,14 +74,9 @@ def collate(
     id = id.index_select(0, sort_order)
     src_tokens = src_tokens.index_select(0, sort_order)
 
-    """Based on examples/speech_recognition/data/collaters.py"""
-    print(s["context"])
-    cxt_embedding = _collate_2d([s["context"] for s in samples])
+    cxt_vectors = torch.cat([s["context"].unsqueeze(0) for s in samples])
     # sort samples by descending number of frames
-    cxt_lengths = torch.LongTensor([s["source"].size(0) for s in samples])
-    # cxt_lengths, sort_order = cxt_lengths.sort(descending=True)
-    cxt_embedding = cxt_embedding.index_select(0, sort_order)
-
+    cxt_vectors = cxt_vectors.index_select(0, sort_order)
     prev_output_tokens = None
     target = None
     if samples[0].get("target", None) is not None:
@@ -123,8 +114,7 @@ def collate(
         "nsentences": len(samples),
         "ntokens": ntokens,
         "net_input": {
-            "cxt_embedding": cxt_embedding,
-            "cxt_lengths": cxt_lengths,
+            "cxt_vectors": cxt_vectors,
             "src_tokens": src_tokens,
             "src_lengths": src_lengths,
         },
@@ -217,7 +207,6 @@ class CueDataset(FairseqDataset):
     def __init__(
         self,
         cxt,
-        cxt_sizes,
         src,
         src_sizes,
         src_dict,
@@ -239,7 +228,7 @@ class CueDataset(FairseqDataset):
         tgt_lang_id=None,
         pad_to_multiple=1,
     ):
-        if tgt_dict is not None: # Make sure tags in both dicts have the same indices
+        if tgt_dict is not None:
             assert src_dict.pad() == tgt_dict.pad()
             assert src_dict.eos() == tgt_dict.eos()
             assert src_dict.unk() == tgt_dict.unk()
@@ -250,11 +239,10 @@ class CueDataset(FairseqDataset):
         self.src = src
         self.tgt = tgt
         self.cxt = cxt
-        self.cxt_sizes = np.array(cxt_sizes)
         self.src_sizes = np.array(src_sizes)
         self.tgt_sizes = np.array(tgt_sizes) if tgt_sizes is not None else None
         self.sizes = (
-            np.vstack((self.cxt_sizes, self.src_sizes, self.tgt_sizes)).T
+            np.vstack((self.src_sizes, self.tgt_sizes)).T
             if self.tgt_sizes is not None
             else self.src_sizes
         )
@@ -276,12 +264,11 @@ class CueDataset(FairseqDataset):
         self.eos = eos if eos is not None else src_dict.eos()
         self.src_lang_id = src_lang_id
         self.tgt_lang_id = tgt_lang_id
-
         self.cxt = cxt
+
         if num_buckets > 0:
             from fairseq.data import BucketPadLengthDataset
 
-            self.cxt_sizes = self.cxt.sizes
             self.src = BucketPadLengthDataset(
                 self.src,
                 sizes=self.src_sizes,
