@@ -276,6 +276,7 @@ class SequenceGenerator(nn.Module):
         # placeholder of indices for bsz * beam_size to hold tokens and accumulative scores
         new_order = torch.arange(bsz).view(-1, 1).repeat(1, beam_size).view(-1)
         new_order = new_order.to(src_tokens.device).long()
+
         encoder_outs = self.model.reorder_encoder_out(encoder_outs, new_order)
         # ensure encoder_outs is a List.
         assert encoder_outs is not None
@@ -284,12 +285,15 @@ class SequenceGenerator(nn.Module):
         scores = (
             torch.zeros(bsz * beam_size, max_len + 1).to(src_tokens).float()
         )  # +1 for eos; pad is never chosen for scoring
+
         tokens = (
             torch.zeros(bsz * beam_size, max_len + 2)
             .to(src_tokens)
             .long()
             .fill_(self.pad)
         )  # +2 for eos and pad
+
+        # This is where bos token is initialised
         tokens[:, 0] = self.eos if bos_token is None else bos_token
         attn: Optional[Tensor] = None
 
@@ -796,6 +800,14 @@ class EnsembleModel(nn.Module):
 
     @torch.jit.export
     def forward_encoder(self, net_input: Dict[str, Tensor]):
+
+        if self.models[0].__class__.__name__ == "CUETransformer":
+            cxt_net_input = {k: v for k, v in net_input.items() if "cxt" in k}
+            src_net_input = {k: v for k, v in net_input.items() if "src" in k}
+
+            return [model.src_encoder.forward_torchscript(src_net_input) | model.cxt_encoder.forward_torchscript(cxt_net_input)
+                    for model in self.models]
+
         if not self.has_encoder():
             return None
         return [model.encoder.forward_torchscript(net_input) for model in self.models]
@@ -812,7 +824,11 @@ class EnsembleModel(nn.Module):
         avg_attn: Optional[Tensor] = None
         encoder_out: Optional[Dict[str, List[Tensor]]] = None
         for i, model in enumerate(self.models):
-            if self.has_encoder():
+            if model.__class__.__name__ == "CUETransformer":
+                encoder_outs[i]['encoder_out'][0] += encoder_outs[i]['cxt_encoder_out'][0]
+                encoder_out = encoder_outs[i]
+
+            elif self.has_encoder():
                 encoder_out = encoder_outs[i]
             # decode each model
             if self.has_incremental_states():
@@ -882,8 +898,19 @@ class EnsembleModel(nn.Module):
             *encoder_out* rearranged according to *new_order*
         """
         new_outs: List[Dict[str, List[Tensor]]] = []
+
+        if self.models[0].__class__.__name__ == "CUETransformer":
+            for i, model in enumerate(self.models):
+                assert encoder_outs is not None
+                new_outs.append(
+                    model.src_encoder.reorder_encoder_out(encoder_outs[i], new_order) |
+                    model.cxt_encoder.reorder_encoder_out(encoder_outs[i], new_order)
+                )
+            return new_outs
+
         if not self.has_encoder():
             return new_outs
+
         for i, model in enumerate(self.models):
             assert encoder_outs is not None
             new_outs.append(

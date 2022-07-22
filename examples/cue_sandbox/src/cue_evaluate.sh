@@ -32,8 +32,6 @@ fairseq-generate data-bin/${DATA} \
     --task cue_translation --source-lang en --target-lang de \
     --path checkpoints/${MODEL}/${CKPT}.pt \
     --batch-size 128 \
-    --remove-bpe=sentencepiece > ${TMP}/test.en-de.out
-grep ^H ${TMP}/test.en-de.out | cut -f3 > ${TMP}/test.en-de.hyp
+    --remove-bpe=sentencepiece
 
-sacrebleu $ROOT/tst-COMMON.de -i ${TMP}/test.en-de.hyp
 #rm -r ${TMP}

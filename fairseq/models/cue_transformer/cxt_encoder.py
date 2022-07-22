@@ -299,28 +299,20 @@ class ContextEncoderBase(FairseqEncoder):
         if self.layer_norm is not None:
             x = self.layer_norm(x)
 
-        # The Pytorch Mobile lite interpreter does not supports returning NamedTuple in
-        # `forward` so we use a dictionary instead.
-        # TorchScript does not support mixed values so the values are all lists.
-        # The empty list is equivalent to None.
-        # cxt_lengths = (
-        #     cxt_vectors.ne(self.padding_idx)
-        #     .sum(dim=1, dtype=torch.int32)
-        #     .reshape(-1, 1)
-        #     .contiguous()
-        # )
+        # average outputs
+        x = torch.mean(x, dim=0)
+
         return {
             "cxt_encoder_out": [x],  # T x B x C
             "cxt_encoder_padding_mask": [cxt_encoder_padding_mask],  # B x T
             "cxt_encoder_embedding": [cxt_encoder_embedding],  # B x T x C
             "cxt_encoder_states": cxt_encoder_states,  # List[T x B x C]
             "fc_results": fc_results,  # List[T x B x C]
-            "cxt_vectors": cxt_vectors,  # B x T x E
-            # "cxt_lengths": cxt_lengths,  # B x 1
+            "cxt_vectors": [],  # B x T x E
         }
 
     @torch.jit.export
-    def reorder_cxt_encoder_out(self, cxt_encoder_out: Dict[str, List[Tensor]], new_order):
+    def reorder_encoder_out(self, cxt_encoder_out: Dict[str, List[Tensor]], new_order):
         """
         Reorder cxt_encoder output according to *new_order*.
 
@@ -334,7 +326,7 @@ class ContextEncoderBase(FairseqEncoder):
         if len(cxt_encoder_out["cxt_encoder_out"]) == 0:
             new_cxt_encoder_out = []
         else:
-            new_cxt_encoder_out = [cxt_encoder_out["cxt_encoder_out"][0].index_select(1, new_order)]
+            new_cxt_encoder_out = [cxt_encoder_out["cxt_encoder_out"][0].index_select(0, new_order)]
         if len(cxt_encoder_out["cxt_encoder_padding_mask"]) == 0:
             new_cxt_encoder_padding_mask = []
         else:
@@ -373,7 +365,7 @@ class ContextEncoderBase(FairseqEncoder):
         }
 
     @torch.jit.export
-    def _reorder_cxt_encoder_out(self, cxt_encoder_out: Dict[str, List[Tensor]], new_order):
+    def _reorder_encoder_out(self, cxt_encoder_out: Dict[str, List[Tensor]], new_order):
         """Dummy re-order function for beamable enc-dec attention"""
         return cxt_encoder_out
 

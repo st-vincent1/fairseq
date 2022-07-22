@@ -125,6 +125,7 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         super().__init__(cxt_encoder, src_encoder, decoder)
         self.cfg = cfg
         self.supports_align_args = True
+        self.context_inclusion = cfg.context_inclusion
 
     @classmethod
     def add_args(cls, parser):
@@ -228,7 +229,6 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
             src_tokens,
             src_lengths,
             prev_output_tokens,
-            context_inclusion: str = None,
             return_all_hiddens: bool = True,
             features_only: bool = False,
             alignment_layer: Optional[int] = None,
@@ -243,7 +243,6 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         which are not supported by TorchScript.
         """
         cxt_encoder_out = self.cxt_encoder(
-            # cxt_vectors=cxt_vectors, cxt_lengths=cxt_lengths,
             cxt_vectors=cxt_vectors,
             return_all_hiddens=return_all_hiddens
         )
@@ -251,11 +250,11 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
             src_tokens=src_tokens, src_lengths=src_lengths,
             return_all_hiddens=return_all_hiddens
         )
-        if context_inclusion == 'add-encoder-outputs':
-            # currently only supported option
-            encoder_out = cxt_encoder_out + src_encoder_out
-        else:
-            encoder_out = src_encoder_out
+        if self.context_inclusion == 'add-encoder-outputs':
+            # currently only supported option; adds cxt vectors to each encoder output position wise
+            src_encoder_out['encoder_out'] += cxt_encoder_out['cxt_encoder_out']
+
+        encoder_out = src_encoder_out
         # Need to figure out what "prev_output_tokens" is during inference.
         # During training, I could simply replace
         decoder_out = self.decoder(
@@ -281,6 +280,7 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
     ):
         """Get normalized probabilities (or log probs) from a net's output."""
         return self.get_normalized_probs_scriptable(net_output, log_probs, sample)
+
 
 # Shadow of transformer_legacy.TransformerModel
 @register_model('cue_transformer')
@@ -331,7 +331,7 @@ class CUETransformer(CUETransformerBase):
                     "--share-all-embeddings requires --encoder-embed-dim to match --decoder-embed-dim"
                 )
             if args.decoder_embed_path and (
-                args.decoder_embed_path != args.encoder_embed_path
+                    args.decoder_embed_path != args.encoder_embed_path
             ):
                 raise ValueError(
                     "--share-all-embeddings not compatible with --decoder-embed-path"
