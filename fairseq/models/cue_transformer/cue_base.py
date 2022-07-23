@@ -31,6 +31,7 @@ from fairseq.models.transformer import (
 )
 from fairseq.models.cue_transformer import (
     ContextEncoderBase,
+    ContextDecoderBase
 )
 from fairseq.models.transformer.transformer_legacy import base_architecture
 
@@ -213,7 +214,7 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
     @classmethod
     def build_decoder(cls, cfg, tgt_dict, embed_tokens):
         logging.info("Building decoder")
-        return TransformerDecoderBase(
+        return ContextDecoderBase(
             cfg,
             tgt_dict,
             embed_tokens,
@@ -250,11 +251,12 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
             src_tokens=src_tokens, src_lengths=src_lengths,
             return_all_hiddens=return_all_hiddens
         )
-        if self.context_inclusion == 'add-encoder-outputs':
+        # if self.context_inclusion == 'add-encoder-outputs':
             # currently only supported option; adds cxt vectors to each encoder output position wise
-            src_encoder_out['encoder_out'] += cxt_encoder_out['cxt_encoder_out']
+            # src_encoder_out['encoder_out'] += cxt_encoder_out['cxt_encoder_out']
 
-        encoder_out = src_encoder_out
+        encoder_out = src_encoder_out | cxt_encoder_out
+
         # Need to figure out what "prev_output_tokens" is during inference.
         # During training, I could simply replace
         decoder_out = self.decoder(

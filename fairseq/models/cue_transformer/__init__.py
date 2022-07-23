@@ -12,6 +12,7 @@ from .cue_config import (
 )
 
 from .cxt_encoder import ContextEncoderBase
+from .cxt_decoder import ContextDecoderBase
 
 from .cue_base import (
     cue_transformer_base
@@ -19,5 +20,6 @@ from .cue_base import (
 __all__ = [
     "cue_transformer_base",
     "CUEConfig",
-    "ContextEncoderBase"
+    "ContextEncoderBase",
+    "ContextDecoderBase"
 ]
