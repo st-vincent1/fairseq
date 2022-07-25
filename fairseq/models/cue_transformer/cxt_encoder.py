@@ -24,8 +24,6 @@ from fairseq.modules import (
     FairseqDropout,
     LayerDropModuleList,
     LayerNorm,
-    PositionalEmbedding,
-    SinusoidalPositionalEmbedding,
     transformer_layer,
 )
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
@@ -177,8 +175,6 @@ class ContextEncoderBase(FairseqEncoder):
             dict:
                 - **cxt_encoder_out** (Tensor): the last cxt_encoder layer's output of
                   shape `(src_len, batch, embed_dim)`
-                - **cxt_encoder_padding_mask** (ByteTensor): the positions of
-                  padding elements of shape `(batch, src_len)`
                 - **cxt_encoder_embedding** (Tensor): the (scaled) embedding lookup
                   of shape `(batch, src_len, embed_dim)`
                 - **cxt_encoder_states** (List[Tensor]): all intermediate
@@ -186,14 +182,14 @@ class ContextEncoderBase(FairseqEncoder):
                   Only populated if *return_all_hiddens* is True.
         """
         # compute padding mask
-        cxt_encoder_padding_mask = torch.sum(cxt_vectors, dim=-1).eq(self.padding_idx)
+        # cxt_encoder_padding_mask = torch.sum(cxt_vectors, dim=-1).eq(self.padding_idx)
 
-        has_pads = cxt_vectors.device.type == "xla" or cxt_encoder_padding_mask.any()
+        # has_pads = cxt_vectors.device.type == "xla" or cxt_encoder_padding_mask.any()
 
         x, cxt_encoder_embedding = self.forward_embedding(cxt_vectors)
         # account for padding while computing the representation
-        if has_pads:
-            x = x * (1 - cxt_encoder_padding_mask.unsqueeze(-1).type_as(x))
+        # if has_pads:
+        #     x = x * (1 - cxt_encoder_padding_mask.unsqueeze(-1).type_as(x))
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
@@ -255,28 +251,29 @@ class ContextEncoderBase(FairseqEncoder):
             # Batch first can not be justified but needs user to make sure
             x = x.transpose(0, 1)
             # Check mask conditions for nested tensor
-            if NT_version:
-                if (
-                    cxt_encoder_padding_mask is not None
-                    and torch._nested_tensor_from_mask_left_aligned(
-                        x, cxt_encoder_padding_mask.logical_not()
-                    )
-                ):
-                    if not torch.is_grad_enabled() or not x.requires_grad:
-                        x = torch._nested_tensor_from_mask(
-                            x, cxt_encoder_padding_mask.logical_not()
-                        )
-                        NT_flag = True
-            BT_flag = True
+            # if NT_version:
+            #     if (
+                    # cxt_encoder_padding_mask is not None
+                    # and torch._nested_tensor_from_mask_left_aligned(
+                    #     x, cxt_encoder_padding_mask.logical_not()
+                    # )
+                # ):
+                #     if not torch.is_grad_enabled() or not x.requires_grad:
+                #         x = torch._nested_tensor_from_mask(
+                #             x, cxt_encoder_padding_mask.logical_not()
+                #         )
+                #         NT_flag = True
+            # BT_flag = True
 
         # cxt_encoder layers
-        if NT_flag:
-            processing_mask = None
-        else:
-            processing_mask = cxt_encoder_padding_mask
-        cxt_encoder_padding_mask_out = processing_mask if has_pads else None
+        # if NT_flag:
+        #     processing_mask = None
+        # else:
+        #     processing_mask = cxt_encoder_padding_mask
+        # cxt_encoder_padding_mask_out = processing_mask if has_pads else None
         for layer in self.layers:
-            lr = layer(x, encoder_padding_mask=cxt_encoder_padding_mask_out)
+            # lr = layer(x, encoder_padding_mask=cxt_encoder_padding_mask_out)
+            lr = layer(x, encoder_padding_mask=None)
 
             if isinstance(lr, tuple) and len(lr) == 2:
                 x, fc_result = lr
@@ -304,7 +301,7 @@ class ContextEncoderBase(FairseqEncoder):
 
         return {
             "cxt_encoder_out": [x],  # T x B x C
-            "cxt_encoder_padding_mask": [cxt_encoder_padding_mask],  # B x T
+            # "cxt_encoder_padding_mask": [cxt_encoder_padding_mask],  # B x T
             "cxt_encoder_embedding": [cxt_encoder_embedding],  # B x T x C
             "cxt_encoder_states": cxt_encoder_states,  # List[T x B x C]
             "fc_results": fc_results,  # List[T x B x C]
@@ -327,12 +324,12 @@ class ContextEncoderBase(FairseqEncoder):
             new_cxt_encoder_out = []
         else:
             new_cxt_encoder_out = [cxt_encoder_out["cxt_encoder_out"][0].index_select(0, new_order)]
-        if len(cxt_encoder_out["cxt_encoder_padding_mask"]) == 0:
-            new_cxt_encoder_padding_mask = []
-        else:
-            new_cxt_encoder_padding_mask = [
-                cxt_encoder_out["cxt_encoder_padding_mask"][0].index_select(0, new_order)
-            ]
+        # if len(cxt_encoder_out["cxt_encoder_padding_mask"]) == 0:
+        #     new_cxt_encoder_padding_mask = []
+        # else:
+        #     new_cxt_encoder_padding_mask = [
+        #         cxt_encoder_out["cxt_encoder_padding_mask"][0].index_select(0, new_order)
+        #     ]
         if len(cxt_encoder_out["cxt_encoder_embedding"]) == 0:
             new_cxt_encoder_embedding = []
         else:
@@ -357,7 +354,7 @@ class ContextEncoderBase(FairseqEncoder):
 
         return {
             "cxt_encoder_out": new_cxt_encoder_out,  # T x B x C
-            "cxt_encoder_padding_mask": new_cxt_encoder_padding_mask,  # B x T
+            # "cxt_encoder_padding_mask": new_cxt_encoder_padding_mask,  # B x T
             "cxt_encoder_embedding": new_cxt_encoder_embedding,  # B x T x C
             "cxt_encoder_states": cxt_encoder_states,  # List[T x B x C]
             "cxt_vectors": cxt_vectors,  # B x T

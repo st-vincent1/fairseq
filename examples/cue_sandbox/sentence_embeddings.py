@@ -9,7 +9,7 @@ import glob
 import os
 from tqdm import tqdm
 
-BSZ = 768 
+BSZ = 256
 
 
 class ContextEmbedding():

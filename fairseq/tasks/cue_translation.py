@@ -1,28 +1,20 @@
-from dataclasses import dataclass, field
-import itertools
-import json
+from dataclasses import dataclass
+
 import logging
 import os
-from typing import Optional
-from argparse import Namespace
-from omegaconf import II
 
-import numpy as np
-from fairseq import metrics, utils
+from fairseq import utils
 from fairseq.data import (
     AppendTokenDataset,
-    ConcatDataset,
     CueDataset,
     PrependTokenDataset,
     StripTokenDataset,
     TruncateDataset,
     data_utils,
-    encoders,
     indexed_dataset,
 )
-from fairseq.data.indexed_dataset import get_available_dataset_impl
-from fairseq.dataclass import ChoiceEnum, FairseqDataclass
-from fairseq.tasks import FairseqTask, register_task
+
+from fairseq.tasks import register_task
 from fairseq.tasks.translation import TranslationConfig, TranslationTask
 
 EVAL_BLEU_ORDER = 4
