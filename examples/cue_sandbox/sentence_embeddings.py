@@ -1,13 +1,10 @@
-import numpy as np
-import pandas as pd
 import torch
 import transformers as ppb  # pytorch-transformers by huggingface
-import warnings
 import pickle
-from datasets import Dataset
 import glob
 import os
 from tqdm import tqdm
+from argparse import ArgumentParser
 
 BSZ = 256
 
@@ -64,10 +61,17 @@ class ContextEmbedding():
         return all_embeddings
 
 
-x = ContextEmbedding()
-path = 'examples/cue_sandbox/data/context'
-for prefix in ['dev', 'tst-COMMON', 'train']:
-    cls_embeddings = x.produce_embeddings(path, prefix=prefix)
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument("--path", default="examples/cue_sandbox/data/context")
+    args = parser.parse_args()
+    x = ContextEmbedding()
+    for prefix in ['dev', 'tst-COMMON', 'train', 'test']:
+        try:
+            cls_embeddings = x.produce_embeddings(args.path, prefix=prefix)
+            with open(f"{os.path.dirname(args.path)}/{prefix}.pkl", 'wb+') as out:
+                pickle.dump({'cxt': cls_embeddings}, out)
 
-    with open(f"{os.path.dirname(path)}/{prefix}.pkl", 'wb+') as out:
-        pickle.dump({'cxt': cls_embeddings}, out)
+        except FileNotFoundError:
+            print(f"Not found {args.path}. Skipping")
+            pass
