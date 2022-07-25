@@ -824,11 +824,8 @@ class EnsembleModel(nn.Module):
         avg_attn: Optional[Tensor] = None
         encoder_out: Optional[Dict[str, List[Tensor]]] = None
         for i, model in enumerate(self.models):
-            if model.__class__.__name__ == "CUETransformer":
-                encoder_outs[i]['encoder_out'][0] += encoder_outs[i]['cxt_encoder_out'][0]
-                encoder_out = encoder_outs[i]
-
-            elif self.has_encoder():
+            # Quick fix todo
+            if model.__class__.__name__ == "CUETransformer" or self.has_encoder():
                 encoder_out = encoder_outs[i]
             # decode each model
             if self.has_incremental_states():
