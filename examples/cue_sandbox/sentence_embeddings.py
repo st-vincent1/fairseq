@@ -6,7 +6,7 @@ import os
 from tqdm import tqdm
 from argparse import ArgumentParser
 
-BSZ = 256
+BSZ = 512
 
 
 class ContextEmbedding():
@@ -25,17 +25,17 @@ class ContextEmbedding():
         _dir = glob.glob(f"{context_dir}/{prefix}*")
         print(_dir)
         # Initialise empty tensor to be later replaced with a proper buffer
-        all_embeddings = torch.empty([0,0,768]).to(self.device)
+        all_embeddings = torch.empty([0,0,768])
         for filepath in _dir:
             with open(filepath) as f:
                 sentences = f.read().splitlines()
 
             # resize buffer
             if all_embeddings.nelement() == 0:
-                all_embeddings = torch.empty([len(sentences), 0, 768]).to(self.device)
+                all_embeddings = torch.empty([len(sentences), 0, 768])
 
             # buffer for embeddings
-            cls_embeddings = torch.empty([0, 768]).to(self.device)
+            cls_embeddings = torch.empty([0, 768])
 
             for i in tqdm(range(0, len(sentences), BSZ)):
                 encoded_input = self.tokenizer(sentences[i:i + BSZ],
@@ -56,7 +56,7 @@ class ContextEmbedding():
                     except IndexError: # no empty strings found
                         pass
 
-                cls_embeddings = torch.cat((cls_embeddings, cls))
+                cls_embeddings = torch.cat((cls_embeddings, cls.cpu()))
             all_embeddings = torch.cat((all_embeddings, cls_embeddings.unsqueeze(1)), dim=1)
         return all_embeddings
 
