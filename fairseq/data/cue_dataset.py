@@ -3,25 +3,25 @@ import logging
 
 import numpy as np
 import torch
+import os
 from fairseq.data import FairseqDataset, data_utils
 
 from examples.cue_sandbox.sentence_embeddings import ContextEmbedding
 
-
+import pickle
 
 logger = logging.getLogger(__name__)
 
 
 def collate(
-    samples,
-    pad_idx,
-    eos_idx,
-    left_pad_source=True,
-    left_pad_target=False,
-    input_feeding=True,
-    pad_to_length=None,
-    pad_to_multiple=1,
-    context_mapper=None
+        samples,
+        pad_idx,
+        eos_idx,
+        left_pad_source=True,
+        left_pad_target=False,
+        input_feeding=True,
+        pad_to_length=None,
+        pad_to_multiple=1,
 ):
     if len(samples) == 0:
         return {}
@@ -41,8 +41,8 @@ def collate(
         if alignment is None or len(alignment) == 0:
             return False
         if (
-            alignment[:, 0].max().item() >= src_len - 1
-            or alignment[:, 1].max().item() >= tgt_len - 1
+                alignment[:, 0].max().item() >= src_len - 1
+                or alignment[:, 1].max().item() >= tgt_len - 1
         ):
             logger.warning("alignment size mismatch found, skipping alignment!")
             return False
@@ -78,9 +78,9 @@ def collate(
     id = id.index_select(0, sort_order)
     src_tokens = src_tokens.index_select(0, sort_order)
 
-    cxt_sentences = [s["context"] for s in samples]
-    cxt_vectors = context_mapper(cxt_sentences)
-    # cxt_vectors = torch.cat([s["context"].unsqueeze(0) for s in samples])
+    # cxt_sentences = [s["context"] for s in samples]
+    # cxt_vectors = context_mapper(cxt_sentences)
+    cxt_vectors = torch.cat([s["context"].unsqueeze(0) for s in samples])
     # sort samples by descending number of frames
     # this is words so far
     cxt_vectors = cxt_vectors.index_select(0, sort_order)
@@ -168,7 +168,7 @@ def collate(
         max_len = max(lens)
         constraints = torch.zeros((len(samples), max(lens))).long()
         for i, sample in enumerate(samples):
-            constraints[i, 0 : lens[i]] = samples[i].get("constraints")
+            constraints[i, 0: lens[i]] = samples[i].get("constraints")
         batch["constraints"] = constraints.index_select(0, sort_order)
 
     return batch
@@ -214,28 +214,28 @@ class CueDataset(FairseqDataset):
     """
 
     def __init__(
-        self,
-        cxt,
-        src,
-        src_sizes,
-        src_dict,
-        tgt=None,
-        tgt_sizes=None,
-        tgt_dict=None,
-        left_pad_source=True,
-        left_pad_target=False,
-        shuffle=True,
-        input_feeding=True,
-        remove_eos_from_source=False,
-        append_eos_to_target=False,
-        align_dataset=None,
-        constraints=None,
-        append_bos=False,
-        eos=None,
-        num_buckets=0,
-        src_lang_id=None,
-        tgt_lang_id=None,
-        pad_to_multiple=1,
+            self,
+            cxt,
+            src,
+            src_sizes,
+            src_dict,
+            tgt=None,
+            tgt_sizes=None,
+            tgt_dict=None,
+            left_pad_source=True,
+            left_pad_target=False,
+            shuffle=True,
+            input_feeding=True,
+            remove_eos_from_source=False,
+            append_eos_to_target=False,
+            align_dataset=None,
+            constraints=None,
+            append_bos=False,
+            eos=None,
+            num_buckets=0,
+            src_lang_id=None,
+            tgt_lang_id=None,
+            pad_to_multiple=1,
     ):
         if tgt_dict is not None:
             assert src_dict.pad() == tgt_dict.pad()
@@ -266,7 +266,7 @@ class CueDataset(FairseqDataset):
         self.align_dataset = align_dataset
         if self.align_dataset is not None:
             assert (
-                self.tgt_sizes is not None
+                    self.tgt_sizes is not None
             ), "Both source and target needed when alignments are provided"
         self.constraints = constraints
         self.append_bos = append_bos
@@ -274,9 +274,6 @@ class CueDataset(FairseqDataset):
         self.src_lang_id = src_lang_id
         self.tgt_lang_id = tgt_lang_id
 
-        # Define context mapper
-        cxt_class = ContextEmbedding()
-        self.context_mapper = cxt_class.produce_single_embedding
 
         if num_buckets > 0:
             from fairseq.data import BucketPadLengthDataset
@@ -322,8 +319,7 @@ class CueDataset(FairseqDataset):
         """
         tgt_item = self.tgt[index] if self.tgt is not None else None
         src_item = self.src[index]
-        # cxt_item = self.cxt(index) # we assume that cxt is a predefined mapping
-        cxt_item = self.cxt[:, index] # this now only retrieves a list of sentences. later they are encoded (in collater)
+        cxt_item = self.cxt[index][0]  # for TensorDataset; the [0] is because return type is tuple (tensor,)
 
         # Append EOS to end of tgt sentence if it does not have an EOS and remove
         # EOS from end of src sentence if it exists. This is useful when we use
@@ -412,7 +408,7 @@ class CueDataset(FairseqDataset):
             input_feeding=self.input_feeding,
             pad_to_length=pad_to_length,
             pad_to_multiple=self.pad_to_multiple,
-            context_mapper=self.context_mapper
+            # context_mapper=self.context_mapper
         )
         if self.src_lang_id is not None or self.tgt_lang_id is not None:
             src_tokens = res["net_input"]["src_tokens"]
@@ -473,7 +469,7 @@ class CueDataset(FairseqDataset):
     @property
     def supports_prefetch(self):
         return getattr(self.src, "supports_prefetch", False) and (
-            getattr(self.tgt, "supports_prefetch", False) or self.tgt is None
+                getattr(self.tgt, "supports_prefetch", False) or self.tgt is None
         ) and (getattr(self.cxt, "supports_prefetch", False) or self.cxt is None)
 
     def prefetch(self, indices):

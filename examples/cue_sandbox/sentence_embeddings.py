@@ -7,68 +7,42 @@ from tqdm import tqdm
 from argparse import ArgumentParser
 import torch.multiprocessing as mp
 import numpy as np
+import logging
 
-BSZ = 256
+logging.basicConfig(level=logging.INFO)
+
+BSZ = 128
 
 
 class ContextEmbedding:
     def __init__(self):
-        mp.set_start_method('spawn', force=True)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.model = ppb.DistilBertModel.from_pretrained('distilbert-base-uncased').to(self.device)
         self.tokenizer = ppb.DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 
-    def produce_single_embedding(self, sentences): # rewrite to take a list of sentences and simply do them
-        if not sentences: return torch.empty([])
-        bsz, num_contexts = len(sentences), len(sentences[0])
-        sentences = np.concatenate(sentences).tolist()
+    def embeddings_to_float_storage(self, input_dir, prefix):
+        def initialise_buffer(filename, num_samples, num_contexts, embed_dim):
+            logging.info(f"--- Initialising buffer with size {num_samples} x {num_contexts} x {embed_dim}")
+            binary_buffer = torch.FloatTensor(
+                torch.FloatStorage.from_file(filename, shared=True, size=num_samples * num_contexts * embed_dim)) \
+                .reshape(num_samples, num_contexts, embed_dim)
+            return binary_buffer
 
-        cls_embeddings = torch.empty([0, 768]).to(self.device)
+        _dir = glob.glob(f"{input_dir}/{prefix}*")
+        out_filename = f"{os.path.dirname(args.path)}/{prefix}.bin"
+        logging.info(f"--- Scrapping data from {_dir} and saving to {out_filename}...")
 
-        for i in tqdm(range(0, len(sentences), BSZ)):
-            encoded_input = self.tokenizer(sentences[i:i + BSZ],
-                                           add_special_tokens=True,
-                                           padding=True,
-                                           truncation=True,
-                                           return_tensors='pt').to(self.device)
-            # indices of empty sentences
-            indices = torch.tensor([i for i, x in enumerate(sentences[i:i + BSZ]) if not x]).to(self.device)
-            with torch.no_grad():
-                # Get last hidden states of model and then extract the cls embedding ([0][:,0,:])
-                cls = self.model(encoded_input['input_ids'],
-                                 attention_mask=encoded_input['attention_mask'])[0][:, 0, :].to(self.device)
+        bin_buff = None
 
-                # nullify matrices where no context given
-                try:
-                    cls = cls.index_fill_(0, indices, 0)
-                except IndexError:  # no empty strings found
-                    pass
-
-            cls_embeddings = torch.cat((cls_embeddings, cls))
-
-        cls_embeddings = torch.reshape(cls_embeddings, (bsz, num_contexts, -1))
-        return cls_embeddings.cpu()
-    def produce_embeddings(self, context_dir, prefix='train'):
-        """Produce context embeddings given a directory.
-        The directory should contain all context files for the given dataset.
-        The context files will all be opened and context extracted
-
-        context files should follow the naming convention of {train,dev,test}.{arbitrary_name}.cxt"""
-
-        _dir = glob.glob(f"{context_dir}/{prefix}*")
-        print(_dir)
-        # Initialise empty tensor to be later replaced with a proper buffer
-        all_embeddings = torch.empty([0,0,768])
-        for filepath in _dir:
+        for file_idx, filepath in enumerate(_dir):
+            # Read sentences from one context file
             with open(filepath) as f:
                 sentences = f.read().splitlines()
 
-            # resize buffer
-            if all_embeddings.nelement() == 0:
-                all_embeddings = torch.empty([len(sentences), 0, 768])
-
-            # buffer for embeddings
-            cls_embeddings = torch.empty([0, 768])
+            # initialise float buffer if not done yet
+            if bin_buff is None:
+                bin_buff = initialise_buffer(out_filename, num_samples=len(sentences), num_contexts=len(_dir),
+                                             embed_dim=768)
 
             for i in tqdm(range(0, len(sentences), BSZ)):
                 encoded_input = self.tokenizer(sentences[i:i + BSZ],
@@ -77,7 +51,8 @@ class ContextEmbedding:
                                                truncation=True,
                                                return_tensors='pt').to(self.device)
                 # indices of empty sentences
-                indices = torch.tensor([i for i, x in enumerate(sentences[i:i+BSZ]) if not x]).to(self.device)
+                indices = torch.tensor([i for i, x in enumerate(sentences[i:i + BSZ]) if not x]).to(self.device)
+
                 with torch.no_grad():
                     # Get last hidden states of model and then extract the cls embedding ([0][:,0,:])
                     cls = self.model(encoded_input['input_ids'],
@@ -86,12 +61,24 @@ class ContextEmbedding:
                     # nullify matrices where no context given
                     try:
                         cls = cls.index_fill_(0, indices, 0)
-                    except IndexError: # no empty strings found
+                    except IndexError:  # no empty strings found
                         pass
+                bin_buff[i:i + BSZ, file_idx, :] = cls
 
-                cls_embeddings = torch.cat((cls_embeddings, cls.cpu()))
-            all_embeddings = torch.cat((all_embeddings, cls_embeddings.unsqueeze(1)), dim=1)
-        return all_embeddings
+
+        # Alternative (bad) approach: save everything at the very end, having concatenated all tensors to all_embeddings
+        # logging.info("--- Binarising tensors...")
+        # all_embeddings = list(all_embeddings)
+        # for idx in tqdm(range(len(all_embeddings))):
+        #     bin_buff[idx] = all_embeddings[idx]
+
+        samples = torch.FloatTensor(
+            torch.FloatStorage.from_file(out_filename, shared=False, size=len(sentences) * 2 * 768)).reshape(
+            len(sentences),
+            2, 768)
+        dataset = torch.utils.data.TensorDataset(samples)
+        print(dataset[0][0])
+        # assert torch.equal(dataset[0][0], all_embeddings[0]), (dataset[0][0], all_embeddings[0])
 
 
 if __name__ == '__main__':
@@ -101,10 +88,7 @@ if __name__ == '__main__':
     x = ContextEmbedding()
     for prefix in ['dev', 'tst-COMMON', 'train', 'test']:
         try:
-            cls_embeddings = x.produce_embeddings(args.path, prefix=prefix)
-            with open(f"{os.path.dirname(args.path)}/{prefix}.pkl", 'wb+') as out:
-                pickle.dump({'cxt': cls_embeddings}, out)
-
+            x.embeddings_to_float_storage(args.path, prefix=prefix)
         except FileNotFoundError:
-            print(f"Not found {args.path}. Skipping")
+            logging.warning(f"Not found {args.path}. Skipping")
             pass

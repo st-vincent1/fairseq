@@ -127,6 +127,7 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         self.cfg = cfg
         self.supports_align_args = True
         self.context_inclusion = cfg.context_inclusion
+        # self.num_contexts = cfg.num_contexts
 
     @classmethod
     def add_args(cls, parser):

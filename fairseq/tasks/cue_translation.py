@@ -20,6 +20,8 @@ from fairseq.data import (
 from fairseq.tasks import register_task
 from fairseq.tasks.translation import TranslationConfig, TranslationTask
 
+from torch.utils.data import TensorDataset
+from torch import FloatStorage, FloatTensor
 EVAL_BLEU_ORDER = 4
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,7 @@ def load_cue_dataset(
         shuffle=True,
         pad_to_multiple=1,
         prepend_bos_src=None,
+        # num_contexts=2
 ):
     """Load dataset.
 
@@ -100,12 +103,14 @@ def load_cue_dataset(
         prefix + tgt, tgt_dict, dataset_impl
     )
 
-    context_lists = load_context_lists(data_path, split)
+    logging.info(f"--- Loading context from {prefix}cxt.bin")
+    cxt_vectors = FloatTensor(
+        FloatStorage.from_file(
+            f"{prefix}cxt.bin", shared=False, size=len(src_dataset) * 2 * 768))\
+        .reshape(len(src_dataset), 2, 768)
 
-    # import pickle
-    # with open(prefix + 'pkl', 'rb') as pkl_file:
-    #     cls_embeddings = pickle.load(pkl_file)['cxt'].to('cpu')
-    #     logger.info(f"Loaded context embeddings from pickle file.")
+    cxt = TensorDataset(cxt_vectors)
+    print(cxt[0][0].device)
 
     if prepend_bos:
         assert hasattr(src_dict, "bos_index") and hasattr(tgt_dict, "bos_index")
@@ -137,7 +142,7 @@ def load_cue_dataset(
 
     tgt_dataset_sizes = tgt_dataset.sizes if tgt_dataset is not None else None
     return CueDataset(
-        context_lists,
+        cxt,
         src_dataset,
         src_dataset.sizes,
         src_dict,
@@ -236,6 +241,7 @@ class CueTranslationTask(TranslationTask):
             num_buckets=self.cfg.num_batch_buckets,
             shuffle=(split != "test"),
             pad_to_multiple=self.cfg.required_seq_len_multiple,
+            # num_contexts=self.num_contexts
         )
 
     def build_dataset_for_inference(self, cxt_vectors, src_tokens, src_lengths, constraints=None):

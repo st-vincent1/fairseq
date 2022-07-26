@@ -61,6 +61,6 @@ fairseq-preprocess --source-lang ${SRC} --target-lang ${TGT} \
     --workers 10
 
 # Move cls embeddings to data-bin/
-cp examples/cue_sandbox/data/dev.pkl ${DEST}/valid.${SRC}-${TGT}.pkl
-cp examples/cue_sandbox/data/tst-COMMON.pkl ${DEST}/test.${SRC}-${TGT}.pkl
-cp examples/cue_sandbox/data/train.pkl ${DEST}/train.${SRC}-${TGT}.pkl
+cp examples/cue_sandbox/data/dev.bin ${DEST}/valid.${SRC}-${TGT}.cxt.bin
+cp examples/cue_sandbox/data/tst-COMMON.bin ${DEST}/test.${SRC}-${TGT}.cxt.bin
+cp examples/cue_sandbox/data/train.bin ${DEST}/train.${SRC}-${TGT}.cxt.bin
