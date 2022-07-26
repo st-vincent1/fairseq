@@ -8,13 +8,38 @@ from argparse import ArgumentParser
 
 BSZ = 512
 
+# import os
+# os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-class ContextEmbedding():
+
+class ContextEmbedding:
     def __init__(self):
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        # self.device = "cpu"
         self.model = ppb.DistilBertModel.from_pretrained('distilbert-base-uncased').to(self.device)
-        self.tokenizer = ppb.DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+        self.tokenizer = ppb.DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 
+    def produce_single_embedding(self, context_lists, index):
+        items = [lst[index] for lst in context_lists]
+        encoded_input = self.tokenizer(items,
+                                       add_special_tokens=True,
+                                       padding=True,
+                                       truncation=True,
+                                       return_tensors='pt').to(self.device)
+        # indices of empty sentences
+        indices = torch.tensor([i for i, x in enumerate(items) if not x]).to(self.device)
+
+        with torch.no_grad():
+            # Get last hidden states of model and then extract the cls embedding ([0][:,0,:])
+            cls = self.model(encoded_input['input_ids'],
+                             attention_mask=encoded_input['attention_mask'])[0][:, 0, :].to(self.device)
+
+            # nullify matrices where no context given
+            try:
+                cls = cls.index_fill_(0, indices, 0)
+            except IndexError:  # no empty strings found
+                pass
+        return cls.cpu()
     def produce_embeddings(self, context_dir, prefix='train'):
         """Produce context embeddings given a directory.
         The directory should contain all context files for the given dataset.

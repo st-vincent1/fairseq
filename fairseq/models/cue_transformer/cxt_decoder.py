@@ -289,7 +289,8 @@ class ContextDecoderBase(FairseqIncrementalDecoder):
             enc = torch.cat((encoder_out["encoder_out"][0], encoder_out["cxt_encoder_out"][0].unsqueeze(0)))
             encoder_out["src_lengths"][0] = torch.add(encoder_out["src_lengths"][0], 1)
         if encoder_out is not None and len(encoder_out["encoder_padding_mask"]) > 0:
-            padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0], encoder_out["cxt_encoder_padding_mask"][0][:,:1]), dim=1)
+            padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0],
+                                      torch.zeros_like(encoder_out["encoder_padding_mask"][0][:,:1])), dim=1)
 
         # embed positions
         positions = None

@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 import logging
 import os
+import glob
+from functools import partial
 
 from fairseq import utils
 from fairseq.data import (
@@ -17,34 +19,35 @@ from fairseq.data import (
 from fairseq.tasks import register_task
 from fairseq.tasks.translation import TranslationConfig, TranslationTask
 
-EVAL_BLEU_ORDER = 4
+from examples.cue_sandbox.sentence_embeddings import ContextEmbedding
 
+EVAL_BLEU_ORDER = 4
 
 logger = logging.getLogger(__name__)
 
 
 def load_cue_dataset(
-    data_path,
-    split,
-    src,
-    src_dict,
-    tgt,
-    tgt_dict,
-    combine,
-    dataset_impl,
-    upsample_primary,
-    left_pad_source,
-    left_pad_target,
-    max_source_positions,
-    max_target_positions,
-    prepend_bos=False,
-    load_alignments=False,
-    truncate_source=False,
-    append_source_id=False,
-    num_buckets=0,
-    shuffle=True,
-    pad_to_multiple=1,
-    prepend_bos_src=None,
+        data_path,
+        split,
+        src,
+        src_dict,
+        tgt,
+        tgt_dict,
+        combine,
+        dataset_impl,
+        upsample_primary,
+        left_pad_source,
+        left_pad_target,
+        max_source_positions,
+        max_target_positions,
+        prepend_bos=False,
+        load_alignments=False,
+        truncate_source=False,
+        append_source_id=False,
+        num_buckets=0,
+        shuffle=True,
+        pad_to_multiple=1,
+        prepend_bos_src=None,
 ):
     """Load dataset.
 
@@ -52,10 +55,25 @@ def load_cue_dataset(
         src, tgt: lang codes
         """
 
+    def load_context_lists(data_path, split):
+        # _dir = glob.glob(f"{data_path}/context/*")
+        print(split)
+        if split == 'valid': split = 'dev'
+        if split == 'test': split = 'tst-COMMON'
+        _dir = glob.glob(f"examples/cue_sandbox/data/context/{split}*")
+        print(data_path)
+        print(_dir)
+        global_sentences = []
+        for filepath in _dir:
+            with open(filepath) as f:
+                sentences = f.read().splitlines()
+                global_sentences.append(sentences)
+        logging.info(f"Loaded {len(global_sentences) * len(global_sentences[0])}")
+        return global_sentences
+
     def split_exists(split, src, tgt, lang, data_path):
         filename = os.path.join(data_path, "{}.{}-{}.{}".format(split, src, tgt, lang))
         return indexed_dataset.dataset_exists(filename, impl=dataset_impl)
-
 
     # infer langcode
     if split_exists(split, src, tgt, src, data_path):
@@ -83,10 +101,15 @@ def load_cue_dataset(
         prefix + tgt, tgt_dict, dataset_impl
     )
 
-    import pickle
-    with open(prefix + 'pkl', 'rb') as pkl_file:
-        cls_embeddings = pickle.load(pkl_file)['cxt'].to('cpu')
-        logger.info(f"Loaded context embeddings from pickle file.")
+    context_lists = load_context_lists(data_path, split)
+    # define partial function with pre-loaded data
+    cxt_class = ContextEmbedding()
+    cxt = lambda idx: cxt_class.produce_single_embedding(context_lists=context_lists, index=idx)
+
+    # import pickle
+    # with open(prefix + 'pkl', 'rb') as pkl_file:
+    #     cls_embeddings = pickle.load(pkl_file)['cxt'].to('cpu')
+    #     logger.info(f"Loaded context embeddings from pickle file.")
 
     if prepend_bos:
         assert hasattr(src_dict, "bos_index") and hasattr(tgt_dict, "bos_index")
@@ -118,7 +141,7 @@ def load_cue_dataset(
 
     tgt_dataset_sizes = tgt_dataset.sizes if tgt_dataset is not None else None
     return CueDataset(
-        cls_embeddings,
+        cxt,  # passes encoding fn
         src_dataset,
         src_dataset.sizes,
         src_dict,
@@ -144,7 +167,6 @@ class CueConfig(TranslationConfig):
 @register_task("cue_translation", dataclass=CueConfig)
 class CueTranslationTask(TranslationTask):
     cfg: CueConfig
-
 
     @classmethod
     def setup_task(cls, cfg: CueConfig, **kwargs):

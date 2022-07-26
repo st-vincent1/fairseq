@@ -75,6 +75,7 @@ def collate(
     src_tokens = src_tokens.index_select(0, sort_order)
     cxt_vectors = torch.cat([s["context"].unsqueeze(0) for s in samples])
     # sort samples by descending number of frames
+    # this is words so far
     cxt_vectors = cxt_vectors.index_select(0, sort_order)
     prev_output_tokens = None
     target = None
@@ -108,6 +109,7 @@ def collate(
     else:
         ntokens = src_lengths.sum().item()
 
+    # Just before the batch is made, encode
     batch = {
         "id": id,
         "nsentences": len(samples),
@@ -309,7 +311,7 @@ class CueDataset(FairseqDataset):
         """
         tgt_item = self.tgt[index] if self.tgt is not None else None
         src_item = self.src[index]
-        cxt_item = self.cxt[index] # we assume that cxt is a predefined mapping
+        cxt_item = self.cxt(index) # we assume that cxt is a predefined mapping
 
         # Append EOS to end of tgt sentence if it does not have an EOS and remove
         # EOS from end of src sentence if it exists. This is useful when we use

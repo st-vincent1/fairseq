@@ -141,8 +141,6 @@ class ContextEncoderBase(FairseqEncoder):
             dict:
                 - **cxt_encoder_out** (Tensor): the last cxt_encoder layer's output of
                   shape `(src_len, batch, embed_dim)`
-                - **cxt_encoder_padding_mask** (ByteTensor): the positions of
-                  padding elements of shape `(batch, src_len)`
                 - **cxt_encoder_embedding** (Tensor): the (scaled) embedding lookup
                   of shape `(batch, src_len, embed_dim)`
                 - **cxt_encoder_states** (List[Tensor]): all intermediate
