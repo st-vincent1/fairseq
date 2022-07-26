@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 import logging
+import numpy as np
 import os
 import glob
 from functools import partial
@@ -18,8 +19,6 @@ from fairseq.data import (
 
 from fairseq.tasks import register_task
 from fairseq.tasks.translation import TranslationConfig, TranslationTask
-
-from examples.cue_sandbox.sentence_embeddings import ContextEmbedding
 
 EVAL_BLEU_ORDER = 4
 
@@ -69,7 +68,7 @@ def load_cue_dataset(
                 sentences = f.read().splitlines()
                 global_sentences.append(sentences)
         logging.info(f"Loaded {len(global_sentences) * len(global_sentences[0])}")
-        return global_sentences
+        return np.array(global_sentences, dtype='unicode_')
 
     def split_exists(split, src, tgt, lang, data_path):
         filename = os.path.join(data_path, "{}.{}-{}.{}".format(split, src, tgt, lang))
@@ -102,9 +101,6 @@ def load_cue_dataset(
     )
 
     context_lists = load_context_lists(data_path, split)
-    # define partial function with pre-loaded data
-    cxt_class = ContextEmbedding(context_lists=context_lists)
-    cxt = cxt_class.produce_single_embedding
 
     # import pickle
     # with open(prefix + 'pkl', 'rb') as pkl_file:
@@ -141,7 +137,7 @@ def load_cue_dataset(
 
     tgt_dataset_sizes = tgt_dataset.sizes if tgt_dataset is not None else None
     return CueDataset(
-        cxt,  # passes encoding fn
+        context_lists,
         src_dataset,
         src_dataset.sizes,
         src_dict,

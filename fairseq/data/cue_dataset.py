@@ -5,6 +5,9 @@ import numpy as np
 import torch
 from fairseq.data import FairseqDataset, data_utils
 
+from examples.cue_sandbox.sentence_embeddings import ContextEmbedding
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +21,7 @@ def collate(
     input_feeding=True,
     pad_to_length=None,
     pad_to_multiple=1,
+    context_mapper=None
 ):
     if len(samples) == 0:
         return {}
@@ -73,10 +77,14 @@ def collate(
     src_lengths, sort_order = src_lengths.sort(descending=True)
     id = id.index_select(0, sort_order)
     src_tokens = src_tokens.index_select(0, sort_order)
-    cxt_vectors = torch.cat([s["context"].unsqueeze(0) for s in samples])
+
+    cxt_sentences = [s["context"] for s in samples]
+    cxt_vectors = context_mapper(cxt_sentences)
+    # cxt_vectors = torch.cat([s["context"].unsqueeze(0) for s in samples])
     # sort samples by descending number of frames
     # this is words so far
     cxt_vectors = cxt_vectors.index_select(0, sort_order)
+
     prev_output_tokens = None
     target = None
     if samples[0].get("target", None) is not None:
@@ -265,7 +273,10 @@ class CueDataset(FairseqDataset):
         self.eos = eos if eos is not None else src_dict.eos()
         self.src_lang_id = src_lang_id
         self.tgt_lang_id = tgt_lang_id
-        self.cxt = cxt
+
+        # Define context mapper
+        cxt_class = ContextEmbedding()
+        self.context_mapper = cxt_class.produce_single_embedding
 
         if num_buckets > 0:
             from fairseq.data import BucketPadLengthDataset
@@ -311,7 +322,8 @@ class CueDataset(FairseqDataset):
         """
         tgt_item = self.tgt[index] if self.tgt is not None else None
         src_item = self.src[index]
-        cxt_item = self.cxt(index) # we assume that cxt is a predefined mapping
+        # cxt_item = self.cxt(index) # we assume that cxt is a predefined mapping
+        cxt_item = self.cxt[:, index] # this now only retrieves a list of sentences. later they are encoded (in collater)
 
         # Append EOS to end of tgt sentence if it does not have an EOS and remove
         # EOS from end of src sentence if it exists. This is useful when we use
@@ -400,6 +412,7 @@ class CueDataset(FairseqDataset):
             input_feeding=self.input_feeding,
             pad_to_length=pad_to_length,
             pad_to_multiple=self.pad_to_multiple,
+            context_mapper=self.context_mapper
         )
         if self.src_lang_id is not None or self.tgt_lang_id is not None:
             src_tokens = res["net_input"]["src_tokens"]

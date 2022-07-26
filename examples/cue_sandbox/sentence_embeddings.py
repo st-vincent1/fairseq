@@ -6,6 +6,8 @@ import os
 from tqdm import tqdm
 from argparse import ArgumentParser
 import torch.multiprocessing as mp
+import numpy as np
+
 BSZ = 512
 
 # import os
@@ -13,34 +15,35 @@ BSZ = 512
 
 
 class ContextEmbedding:
-    def __init__(self, context_lists):
+    def __init__(self):
         mp.set_start_method('spawn', force=True)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         # self.device = "cpu"
         self.model = ppb.DistilBertModel.from_pretrained('distilbert-base-uncased').to(self.device)
         self.tokenizer = ppb.DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-        self.context_lists = context_lists
 
-    def produce_single_embedding(self, index):
-        items = [lst[index] for lst in self.context_lists]
-        encoded_input = self.tokenizer(items,
+    def produce_single_embedding(self, sentences): # rewrite to take a list of sentences and simply do them
+        if not sentences: return torch.empty([])
+        bsz, num_contexts = len(sentences), len(sentences[0])
+        sentences = np.concatenate(sentences).tolist()
+        encoded_input = self.tokenizer(sentences,
                                        add_special_tokens=True,
                                        padding=True,
                                        truncation=True,
                                        return_tensors='pt').to(self.device)
         # indices of empty sentences
-        indices = torch.tensor([i for i, x in enumerate(items) if not x]).to(self.device)
+        indices = torch.tensor([i for i, x in enumerate(sentences) if not x]).to(self.device)
 
         with torch.no_grad():
             # Get last hidden states of model and then extract the cls embedding ([0][:,0,:])
             cls = self.model(encoded_input['input_ids'],
                              attention_mask=encoded_input['attention_mask'])[0][:, 0, :].to(self.device)
-
             # nullify matrices where no context given
             try:
                 cls = cls.index_fill_(0, indices, 0)
             except IndexError:  # no empty strings found
                 pass
+        cls = torch.reshape(cls, (bsz, num_contexts, -1))
         return cls.cpu()
     def produce_embeddings(self, context_dir, prefix='train'):
         """Produce context embeddings given a directory.
