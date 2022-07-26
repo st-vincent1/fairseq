@@ -9,7 +9,7 @@ SPM_MODEL=$ROOT/${TASK}/${TASK}.spm.bpe.model
 TMP=examples/cue_sandbox/tmp
 mkdir -p $TMP
 
-CKPT=$1
+CKPT=${1:-'checkpoint_best'}
 #
 ## SPM encode
 #cat test.en-de.en | python scripts/spm_encode.py \

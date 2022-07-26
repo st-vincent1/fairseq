@@ -29,6 +29,8 @@ class ContextEmbedding:
             return binary_buffer
 
         _dir = glob.glob(f"{input_dir}/{prefix}*")
+        if not _dir:
+            return
         out_filename = f"{os.path.dirname(args.path)}/{prefix}.bin"
         logging.info(f"--- Scrapping data from {_dir} and saving to {out_filename}...")
 
@@ -72,13 +74,11 @@ class ContextEmbedding:
         # for idx in tqdm(range(len(all_embeddings))):
         #     bin_buff[idx] = all_embeddings[idx]
 
-        samples = torch.FloatTensor(
-            torch.FloatStorage.from_file(out_filename, shared=False, size=len(sentences) * 2 * 768)).reshape(
-            len(sentences),
-            2, 768)
-        dataset = torch.utils.data.TensorDataset(samples)
-        print(dataset[0][0])
-        # assert torch.equal(dataset[0][0], all_embeddings[0]), (dataset[0][0], all_embeddings[0])
+#        samples = torch.FloatTensor(
+#            torch.FloatStorage.from_file(out_filename, shared=False, size=len(sentences) * 2 * 768)).reshape(
+#            len(sentences),
+#            2, 768)
+#        dataset = torch.utils.data.TensorDataset(samples)
 
 
 if __name__ == '__main__':
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     parser.add_argument("--path", default="examples/cue_sandbox/data/context")
     args = parser.parse_args()
     x = ContextEmbedding()
-    for prefix in ['dev', 'tst-COMMON', 'train', 'test']:
+    for prefix in ['train', 'test']:
         try:
             x.embeddings_to_float_storage(args.path, prefix=prefix)
         except FileNotFoundError:
