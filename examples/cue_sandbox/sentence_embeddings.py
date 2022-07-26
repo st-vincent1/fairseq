@@ -5,7 +5,7 @@ import glob
 import os
 from tqdm import tqdm
 from argparse import ArgumentParser
-
+import torch.multiprocessing as mp
 BSZ = 512
 
 # import os
@@ -13,14 +13,16 @@ BSZ = 512
 
 
 class ContextEmbedding:
-    def __init__(self):
+    def __init__(self, context_lists):
+        mp.set_start_method('spawn', force=True)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         # self.device = "cpu"
         self.model = ppb.DistilBertModel.from_pretrained('distilbert-base-uncased').to(self.device)
         self.tokenizer = ppb.DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        self.context_lists = context_lists
 
-    def produce_single_embedding(self, context_lists, index):
-        items = [lst[index] for lst in context_lists]
+    def produce_single_embedding(self, index):
+        items = [lst[index] for lst in self.context_lists]
         encoded_input = self.tokenizer(items,
                                        add_special_tokens=True,
                                        padding=True,

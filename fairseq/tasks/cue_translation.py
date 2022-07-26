@@ -103,8 +103,8 @@ def load_cue_dataset(
 
     context_lists = load_context_lists(data_path, split)
     # define partial function with pre-loaded data
-    cxt_class = ContextEmbedding()
-    cxt = lambda idx: cxt_class.produce_single_embedding(context_lists=context_lists, index=idx)
+    cxt_class = ContextEmbedding(context_lists=context_lists)
+    cxt = cxt_class.produce_single_embedding
 
     # import pickle
     # with open(prefix + 'pkl', 'rb') as pkl_file:
