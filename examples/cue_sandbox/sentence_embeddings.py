@@ -8,10 +8,12 @@ from argparse import ArgumentParser
 import torch.multiprocessing as mp
 import numpy as np
 import logging
+from os.path import dirname
+
 
 logging.basicConfig(level=logging.INFO)
 
-BSZ = 128
+BSZ = 1024 
 
 
 class ContextEmbedding:
@@ -31,7 +33,11 @@ class ContextEmbedding:
         _dir = glob.glob(f"{input_dir}/{prefix}*")
         if not _dir:
             return
-        out_filename = f"{os.path.dirname(args.path)}/{prefix}.bin"
+        out_filename = f"{dirname(dirname(input_dir))}/{prefix}.bin"
+        
+        if os.path.exists(out_filename):
+            logging.warning(f"--- Binarised file for {prefix} already exists. skipping...")
+            return
         logging.info(f"--- Scrapping data from {_dir} and saving to {out_filename}...")
 
         bin_buff = None
@@ -86,7 +92,7 @@ if __name__ == '__main__':
     parser.add_argument("--path", default="examples/cue_sandbox/data/context")
     args = parser.parse_args()
     x = ContextEmbedding()
-    for prefix in ['train', 'test']:
+    for prefix in ['test', 'valid', 'dev', 'train', 'tst-COMMON']:
         try:
             x.embeddings_to_float_storage(args.path, prefix=prefix)
         except FileNotFoundError:
