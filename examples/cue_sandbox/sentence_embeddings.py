@@ -1,19 +1,16 @@
 import torch
 import transformers as ppb  # pytorch-transformers by huggingface
-import pickle
 import glob
 import os
 from tqdm import tqdm
 from argparse import ArgumentParser
-import torch.multiprocessing as mp
-import numpy as np
-import logging
-from os.path import dirname
 
+import logging
+import itertools
 
 logging.basicConfig(level=logging.INFO)
 
-BSZ = 4096 
+BSZ = 4096
 
 
 class ContextEmbedding:
@@ -35,12 +32,11 @@ class ContextEmbedding:
         if not _dir:
             raise FileNotFoundError
         out_filename = os.path.join(input_dir, f"{prefix}.bin")
-        
+
         if os.path.exists(out_filename):
             logging.warning(f"--- Binarised file for {prefix} already exists. skipping...")
             raise FileNotFoundError
         logging.info(f"--- Scrapping data from {_dir} and saving to {out_filename}...")
-
 
         for file_idx, filepath in enumerate(_dir):
             bin_buff = None
@@ -51,7 +47,7 @@ class ContextEmbedding:
             # initialise float buffer if not done yet
             if bin_buff is None:
                 out_filename = os.path.join(input_dir, f"{prefix}_{file_idx}.bin")
-                bin_buff = initialise_buffer(out_filename, num_samples=len(sentences), num_contexts=1, # len(_dir)
+                bin_buff = initialise_buffer(out_filename, num_samples=len(sentences), num_contexts=1,
                                              embed_dim=768)
 
             for i in tqdm(range(0, len(sentences), BSZ)):
@@ -76,25 +72,29 @@ class ContextEmbedding:
                 bin_buff[i:i + BSZ, 0, :] = cls
 
         return len(sentences), len(_dir)
-        # Alternative (bad) approach: save everything at the very end, having concatenated all tensors to all_embeddings
-        # logging.info("--- Binarising tensors...")
-        # all_embeddings = list(all_embeddings)
-        # for idx in tqdm(range(len(all_embeddings))):
-        #     bin_buff[idx] = all_embeddings[idx]
 
-    def combine_storages(self, dirname, prefix, data_len, num_contexts, embed_dim):
+    @staticmethod
+    def combine_storages(dirname, prefix, data_len, num_contexts, embed_dim):
         full_buffer = torch.FloatTensor(
-                torch.FloatStorage.from_file(os.path.join(dirname, f"{prefix}.bin"), shared=True, size=data_len * num_contexts * embed_dim)) \
-                .reshape(data_len, num_contexts, embed_dim)
- 
-        
+            torch.FloatStorage.from_file(os.path.join(dirname, f"{prefix}.bin"), shared=True,
+                                         size=data_len * num_contexts * embed_dim)) \
+            .reshape(data_len, num_contexts, embed_dim)
+
         for i in range(num_contexts):
             samples = torch.FloatTensor(
-                torch.FloatStorage.from_file(os.path.join(dirname, f"{prefix}_{i}.bin"), shared=False, size=data_len * 1 * 768)).reshape(
-                data_len,
-                1, 768)
+                torch.FloatStorage.from_file(os.path.join(dirname, f"{prefix}_{i}.bin"), shared=False,
+                                             size=data_len * 1 * 768)).reshape(
+                data_len, 1, 768)
             print(full_buffer.shape, samples.shape)
-            full_buffer[:,i,:] = samples.squeeze()
+            full_buffer[:, i, :] = samples.squeeze()
+
+    @staticmethod
+    def delete_partial_files(path, prefix):
+        for i in itertools.count():
+            try:
+                os.remove(os.path.join(path, f"{prefix}_{i}.bin"))
+            except OSError:
+                return
 
 
 if __name__ == '__main__':
@@ -104,8 +104,10 @@ if __name__ == '__main__':
     x = ContextEmbedding()
     for prefix in ['test', 'valid', 'dev', 'train', 'tst-COMMON']:
         try:
+            # Save contexts to individual files
             data_len, num_contexts = x.embeddings_to_float_storage(args.path, prefix=prefix)
             x.combine_storages(args.path, prefix=prefix, data_len=data_len, num_contexts=num_contexts, embed_dim=768)
+            x.delete_partial_files(args.path, prefix=prefix)
         except FileNotFoundError:
             logging.warning(f"Not found {args.path}. Skipping")
             pass
