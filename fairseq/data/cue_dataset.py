@@ -6,8 +6,6 @@ import torch
 import os
 from fairseq.data import FairseqDataset, data_utils
 
-from examples.cue_sandbox.sentence_embeddings import ContextEmbedding
-
 import pickle
 
 logger = logging.getLogger(__name__)

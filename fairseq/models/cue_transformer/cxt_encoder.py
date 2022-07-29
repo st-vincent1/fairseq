@@ -388,12 +388,10 @@ class ContextEncoderBase(FairseqEncoder):
 
 
 class ContextEncoder(ContextEncoderBase):
-    def __init__(self, args, dictionary, embed_tokens, return_fc=False):
+    def __init__(self, args, return_fc=False):
         self.args = args
         super().__init__(
             CUEConfig.from_namespace(args),
-            dictionary,
-            embed_tokens,
             return_fc=return_fc,
         )
 
