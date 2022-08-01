@@ -236,18 +236,18 @@ class ContextEncoderBase(FairseqEncoder):
                 ):
                     NT_version = True
 
-        if (
-            BT_version
-            and x.dim() == 3
-            and layer.load_to_BT
-            and not layer.return_fc
-            and layer.can_use_fastpath
-            and not layer.training
-            and not layer.ever_training
-            and not layer.cfg_checkpoint_activations
-        ):
+        # if (
+        #     BT_version
+        #     and x.dim() == 3
+        #     and layer.load_to_BT
+        #     and not layer.return_fc
+        #     and layer.can_use_fastpath
+        #     and not layer.training
+        #     and not layer.ever_training
+        #     and not layer.cfg_checkpoint_activations
+        # ):
             # Batch first can not be justified but needs user to make sure
-            x = x.transpose(0, 1)
+            # x = x.transpose(0, 1)
             # Check mask conditions for nested tensor
             # if NT_version:
             #     if (
