@@ -285,12 +285,20 @@ class ContextDecoderBase(FairseqIncrementalDecoder):
 
         enc: Optional[Tensor] = None
         padding_mask: Optional[Tensor] = None
+
         if encoder_out is not None and len(encoder_out["encoder_out"]) > 0:
-            enc = torch.cat((encoder_out["encoder_out"][0], encoder_out["cxt_encoder_out"][0].unsqueeze(0)))
-            encoder_out["src_lengths"][0] = torch.add(encoder_out["src_lengths"][0], 1)
+            if self.cfg.context_inclusion == 'cxt-src-concat':
+                enc = torch.cat((encoder_out["encoder_out"][0], encoder_out["cxt_encoder_out"][0].unsqueeze(0)))
+                encoder_out["src_lengths"][0] = torch.add(encoder_out["src_lengths"][0], 1)
+            else: # context was inserted elsewhere
+                enc = encoder_out["encoder_out"][0]
+
         if encoder_out is not None and len(encoder_out["encoder_padding_mask"]) > 0:
-            padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0],
+            if self.cfg.context_inclusion == 'cxt-src-concat':
+                padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0],
                                       torch.zeros_like(encoder_out["encoder_padding_mask"][0][:,:1])), dim=1)
+            else: # context was inserted elsewhere
+                padding_mask = encoder_out["encoder_padding_mask"][0]
 
         # embed positions
         positions = None

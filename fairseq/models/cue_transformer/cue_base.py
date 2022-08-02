@@ -126,8 +126,6 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
         super().__init__(cxt_encoder, src_encoder, decoder)
         self.cfg = cfg
         self.supports_align_args = True
-        self.context_inclusion = cfg.context_inclusion
-        # self.num_contexts = cfg.num_contexts
 
     @classmethod
     def add_args(cls, parser):
@@ -227,7 +225,6 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
     def forward(
             self,
             cxt_vectors,
-            # cxt_lengths,
             src_tokens,
             src_lengths,
             prev_output_tokens,
@@ -252,7 +249,7 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
             src_tokens=src_tokens, src_lengths=src_lengths,
             return_all_hiddens=return_all_hiddens
         )
-        # if self.context_inclusion == 'add-encoder-outputs':
+        # if self.cfg.context_inclusion == 'add-encoder-outputs':
             # currently only supported option; adds cxt vectors to each encoder output position wise
             # src_encoder_out['encoder_out'] += cxt_encoder_out['cxt_encoder_out']
 
@@ -302,8 +299,10 @@ class CUETransformer(CUETransformerBase):
             parser, CUEConfig(), delete_default=True, with_prefix=""
         )
         # ST Vincent: Adding extra parameters
-        parser.add_argument('--context-inclusion', choices=['add-encoder-outputs', 'tag-enc', 'replace-dec-bos'],
+        parser.add_argument('--context-inclusion', choices=['cxt-src-concat', 'add-encoder-outputs', 'tag-enc', 'replace-dec-bos'],
                             default='add-encoder-outputs', help='how output from context encoder should be included')
+        parser.add_argument('--context-just-embed', default=False, action='store_true',
+                            help='if True, context vectors get embedded and skip past ContextEncoder')
         parser.add_argument('--cls-dim', default=768, help='dimension of CLS token input')
 
     @classmethod
@@ -373,5 +372,6 @@ class CUETransformer(CUETransformerBase):
 @register_model_architecture('cue_transformer', 'cue_transformer_base')
 def cue_transformer_base(args):
     args.context_inclusion = getattr(args, 'context_inclusion', 'add-encoder-outputs')
+    args.context_just_embed = getattr(args, 'context_just_embed', False)
     args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 4)
     base_architecture(args)

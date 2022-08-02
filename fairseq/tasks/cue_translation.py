@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import logging
 import numpy as np
@@ -110,7 +110,6 @@ def load_cue_dataset(
         .reshape(len(src_dataset), 2, 768)
 
     cxt = TensorDataset(cxt_vectors)
-    print(cxt[0][0].device)
 
     if prepend_bos:
         assert hasattr(src_dict, "bos_index") and hasattr(tgt_dict, "bos_index")
@@ -162,7 +161,9 @@ def load_cue_dataset(
 @dataclass
 class CueConfig(TranslationConfig):
     """Copied config from Translation task. New arguments can be added below."""
-    pass
+    context_just_embed: bool = field(
+        default=False, metadata={"help": "if true, just embed context, don't go through layers of encoder"}
+    )
 
 
 @register_task("cue_translation", dataclass=CueConfig)

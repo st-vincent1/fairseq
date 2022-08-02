@@ -1,8 +1,9 @@
 import re
 from tqdm import tqdm
 
-for split in ["train", "dev", "test"]:
-  with open(f'examples/cue_sandbox/data/en-pl/en-pl.{split}.bpe.cxt') as f:
+#for split in ["train", "dev", "test"]:
+for split in ["train"]: 
+  with open(f'examples/cue_sandbox/en-pl/data/en-pl.{split}.bpe.cxt') as f:
     lines = f.read().splitlines()
   
   new_data = {
@@ -40,6 +41,6 @@ for split in ["train", "dev", "test"]:
       new_data["formality"].append("")
   
   for cxt in new_data.keys():
-    with open(f'examples/cue_sandbox/data/en-pl/context/{split}.{cxt}.cxt', 'w+') as f:
+    with open(f'examples/cue_sandbox/en-pl/data/context/{split}.{cxt}.cxt', 'w+') as f:
       for line in new_data[cxt]:
         f.write(line + "\n")

@@ -122,18 +122,14 @@ class ContextEncoderBase(FairseqEncoder):
             x = self.quant_noise(x)
         return x, embed
 
-
     def forward(
-        self,
-        cxt_vectors,
-        return_all_hiddens: bool = False
+            self,
+            cxt_vectors,
+            return_all_hiddens: bool = False
     ):
         """
         Args:
-            src_tokens (LongTensor): tokens in the source language of shape
-                `(batch, src_len)`
-            cxt_lengths (torch.LongTensor): lengths of each source sentence of
-                shape `(batch)`
+            cxt_vectors: todo
             return_all_hiddens (bool, optional): also return all of the
                 intermediate hidden states (default: False).
 
@@ -156,9 +152,9 @@ class ContextEncoderBase(FairseqEncoder):
     # Current workaround is to add a helper function with different name and
     # call the helper function from scriptable Subclass.
     def forward_scriptable(
-        self,
-        cxt_vectors,
-        return_all_hiddens: bool = False
+            self,
+            cxt_vectors,
+            return_all_hiddens: bool = False
     ):
         """
         Args:
@@ -179,15 +175,8 @@ class ContextEncoderBase(FairseqEncoder):
                   hidden states of shape `(src_len, batch, embed_dim)`.
                   Only populated if *return_all_hiddens* is True.
         """
-        # compute padding mask
-        # cxt_encoder_padding_mask = torch.sum(cxt_vectors, dim=-1).eq(self.padding_idx)
-
-        # has_pads = cxt_vectors.device.type == "xla" or cxt_encoder_padding_mask.any()
 
         x, cxt_encoder_embedding = self.forward_embedding(cxt_vectors)
-        # account for padding while computing the representation
-        # if has_pads:
-        #     x = x * (1 - cxt_encoder_padding_mask.unsqueeze(-1).type_as(x))
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
@@ -198,108 +187,29 @@ class ContextEncoderBase(FairseqEncoder):
         if return_all_hiddens:
             cxt_encoder_states.append(x)
 
-        # nested tensor and BT enable
-        layer = self.layers[0]
-        BT_flag = False
-        NT_flag = False
-        # torch version check, BT>=1.12.0 and NT>=1.13.0.dev20220613
-        # internal format is '1.13.0a0+fb'
-        # external format is '1.13.0.dev20220613'(cpu&gpu) for nightly or "1.11.0"(cpu) or '1.11.0+cu102'(gpu) for stable
-        BT_version = False
-        NT_version = False
-        if "fb" in torch.__version__:
-            BT_version = True
-            NT_version = True
-        else:
-            if "+" in torch.__version__:
-                torch_version = torch.__version__.split("+")[0]
-            else:
-                torch_version = torch.__version__
+        if not self.cfg.context_just_embed:
+            for layer in self.layers:
+                lr = layer(x, encoder_padding_mask=None)
 
-            torch_version = torch_version.split(".")
-            int_version = (
-                int(torch_version[0]) * 1000
-                + int(torch_version[1]) * 10
-                + int(torch_version[2])
-            )
-            if len(torch_version) == 3:
-                if int_version >= 1120:
-                    BT_version = True
-                if int_version >= 1131:
-                    NT_version = True
-            elif len(torch_version) == 4:
-                if int_version >= 1130:
-                    BT_version = True
-                # Consider _nested_tensor_from_mask_left_aligned is landed after "20220613"
-                if int_version >= 1131 or (
-                    int_version == 1130 and torch_version[3][3:] >= "20220613"
-                ):
-                    NT_version = True
+                if isinstance(lr, tuple) and len(lr) == 2:
+                    x, fc_result = lr
+                else:
+                    x = lr
+                    fc_result = None
 
-        # if (
-        #     BT_version
-        #     and x.dim() == 3
-        #     and layer.load_to_BT
-        #     and not layer.return_fc
-        #     and layer.can_use_fastpath
-        #     and not layer.training
-        #     and not layer.ever_training
-        #     and not layer.cfg_checkpoint_activations
-        # ):
-            # Batch first can not be justified but needs user to make sure
-            # x = x.transpose(0, 1)
-            # Check mask conditions for nested tensor
-            # if NT_version:
-            #     if (
-                    # cxt_encoder_padding_mask is not None
-                    # and torch._nested_tensor_from_mask_left_aligned(
-                    #     x, cxt_encoder_padding_mask.logical_not()
-                    # )
-                # ):
-                #     if not torch.is_grad_enabled() or not x.requires_grad:
-                #         x = torch._nested_tensor_from_mask(
-                #             x, cxt_encoder_padding_mask.logical_not()
-                #         )
-                #         NT_flag = True
-            # BT_flag = True
+                if return_all_hiddens and not torch.jit.is_scripting():
+                    assert cxt_encoder_states is not None
+                    cxt_encoder_states.append(x)
+                    fc_results.append(fc_result)
 
-        # cxt_encoder layers
-        # if NT_flag:
-        #     processing_mask = None
-        # else:
-        #     processing_mask = cxt_encoder_padding_mask
-        # cxt_encoder_padding_mask_out = processing_mask if has_pads else None
-        for layer in self.layers:
-            # lr = layer(x, encoder_padding_mask=cxt_encoder_padding_mask_out)
-            lr = layer(x, encoder_padding_mask=None)
-
-            if isinstance(lr, tuple) and len(lr) == 2:
-                x, fc_result = lr
-            else:
-                x = lr
-                fc_result = None
-
-            if return_all_hiddens and not torch.jit.is_scripting():
-                assert cxt_encoder_states is not None
-                cxt_encoder_states.append(x)
-                fc_results.append(fc_result)
-
-        # change back to non-nested and Batch second
-        if NT_flag:
-            x = x.to_padded_tensor(0.0)
-
-        if NT_flag or BT_flag:
-            x = x.transpose(0, 1)
-
-        if self.layer_norm is not None:
-            x = self.layer_norm(x)
+            if self.layer_norm is not None:
+                x = self.layer_norm(x)
 
         # average outputs
         x = torch.mean(x, dim=0)
 
         return {
             "cxt_encoder_out": [x],  # T x B x C
-            # "cxt_encoder_padding_mask": [cxt_encoder_padding_mask],  # B x T
             "cxt_encoder_embedding": [cxt_encoder_embedding],  # B x T x C
             "cxt_encoder_states": cxt_encoder_states,  # List[T x B x C]
             "fc_results": fc_results,  # List[T x B x C]
@@ -322,12 +232,7 @@ class ContextEncoderBase(FairseqEncoder):
             new_cxt_encoder_out = []
         else:
             new_cxt_encoder_out = [cxt_encoder_out["cxt_encoder_out"][0].index_select(0, new_order)]
-        # if len(cxt_encoder_out["cxt_encoder_padding_mask"]) == 0:
-        #     new_cxt_encoder_padding_mask = []
-        # else:
-        #     new_cxt_encoder_padding_mask = [
-        #         cxt_encoder_out["cxt_encoder_padding_mask"][0].index_select(0, new_order)
-        #     ]
+
         if len(cxt_encoder_out["cxt_encoder_embedding"]) == 0:
             new_cxt_encoder_embedding = []
         else:
@@ -340,11 +245,6 @@ class ContextEncoderBase(FairseqEncoder):
         else:
             cxt_vectors = [(cxt_encoder_out["cxt_vectors"][0]).index_select(0, new_order)]
 
-        # if len(cxt_encoder_out["cxt_lengths"]) == 0:
-        #     cxt_lengths = []
-        # else:
-        #     cxt_lengths = [(cxt_encoder_out["cxt_lengths"][0]).index_select(0, new_order)]
-
         cxt_encoder_states = cxt_encoder_out["cxt_encoder_states"]
         if len(cxt_encoder_states) > 0:
             for idx, state in enumerate(cxt_encoder_states):
@@ -352,11 +252,9 @@ class ContextEncoderBase(FairseqEncoder):
 
         return {
             "cxt_encoder_out": new_cxt_encoder_out,  # T x B x C
-            # "cxt_encoder_padding_mask": new_cxt_encoder_padding_mask,  # B x T
             "cxt_encoder_embedding": new_cxt_encoder_embedding,  # B x T x C
             "cxt_encoder_states": cxt_encoder_states,  # List[T x B x C]
             "cxt_vectors": cxt_vectors,  # B x T
-            # "cxt_lengths": cxt_lengths,  # B x 1
         }
 
     @torch.jit.export

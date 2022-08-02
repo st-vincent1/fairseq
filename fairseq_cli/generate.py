@@ -400,15 +400,12 @@ def _main(cfg: DictConfig, output_file):
 
 def cli_main():
     parser = options.get_generation_parser()
-    # TODO: replace this workaround with refactoring of `AudioPretraining`
-    parser.add_argument(
-        "--arch",
-        "-a",
-        metavar="ARCH",
-        default="wav2vec2",
-        help="Model architecture. For constructing tasks that rely on "
-        "model args (e.g. `AudioPretraining`)",
-    )
+    parser.add_argument('--context-inclusion',
+                        choices=['cxt-src-concat', 'add-encoder-outputs', 'tag-enc', 'replace-dec-bos'],
+                        default='add-encoder-outputs', help='how output from context encoder should be included')
+    parser.add_argument('--context-just-embed', default=False, action='store_true',
+                        help='if True, context vectors get embedded and skip past ContextEncoder')
+    parser.add_argument('--cls-dim', default=768, help='dimension of CLS token input')
     args = options.parse_args_and_arch(parser)
     main(args)
 

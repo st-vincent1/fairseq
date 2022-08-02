@@ -28,13 +28,14 @@ CKPT=${1:-'checkpoint_best'}
 #
 #rm -r ${TMP}
 
-fairseq-generate data-bin/${DATA} \
-    --task cue_translation --source-lang en --target-lang pl \
-    --path checkpoints/${MODEL}/${CKPT}.pt \
-    --batch-size 1500 \
-    --remove-bpe=sentencepiece > ${TMP}/test.sys 2> /dev/null 
-
-grep ^H ${TMP}/test.sys | LC_ALL=C sort -V | cut -f3- > ${TMP}/test.hyp
+#fairseq-generate data-bin/${DATA} \
+#    --task cue_translation --source-lang en --target-lang pl \
+#    --path checkpoints/${MODEL}/${CKPT}.pt \
+#    --batch-size 64 \
+#    --remove-bpe=sentencepiece \
+#    --context-inclusion cxt-src-concat > ${TMP}/test.sys #2> /dev/null 
+#
+#grep ^H ${TMP}/test.sys | LC_ALL=C sort -V | cut -f3- > ${TMP}/test.hyp
 
 sacrebleu $ROOT/data/en-pl.test.pl -i ${TMP}/test.hyp
 
