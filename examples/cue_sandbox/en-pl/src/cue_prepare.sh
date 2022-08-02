@@ -20,6 +20,6 @@ fairseq-preprocess --source-lang ${SRC} --target-lang ${TGT} \
     --workers 10
 
 # Move cls embeddings to data-bin/
-cp ${ROOT}/data/dev.bin ${DEST}/valid.${SRC}-${TGT}.bin
-cp ${ROOT}/data/test.bin ${DEST}/test.${SRC}-${TGT}.bin
-cp ${ROOT}/data/train.bin ${DEST}/train.${SRC}-${TGT}.bin
+cp ${ROOT}/data/dev.bin ${DEST}/valid.${SRC}-${TGT}.cxt.bin
+cp ${ROOT}/data/test.bin ${DEST}/test.${SRC}-${TGT}.cxt.bin
+cp ${ROOT}/data/train.bin ${DEST}/train.${SRC}-${TGT}.cxt.bin
