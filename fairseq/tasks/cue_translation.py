@@ -56,23 +56,6 @@ def load_cue_dataset(
     Args:
         src, tgt: lang codes
         """
-
-    def load_context_lists(data_path, split):
-        # _dir = glob.glob(f"{data_path}/context/*")
-        print(split)
-        if split == 'valid': split = 'dev'
-        if split == 'test': split = 'tst-COMMON'
-        _dir = glob.glob(f"examples/cue_sandbox/data/context/{split}*")
-        print(data_path)
-        print(_dir)
-        global_sentences = []
-        for filepath in _dir:
-            with open(filepath) as f:
-                sentences = f.read().splitlines()
-                global_sentences.append(sentences)
-        logging.info(f"Loaded {len(global_sentences) * len(global_sentences[0])}")
-        return np.array(global_sentences, dtype='unicode_')
-
     def split_exists(split, src, tgt, lang, data_path):
         filename = os.path.join(data_path, "{}.{}-{}.{}".format(split, src, tgt, lang))
         return indexed_dataset.dataset_exists(filename, impl=dataset_impl)
@@ -106,8 +89,8 @@ def load_cue_dataset(
     logging.info(f"--- Loading context from {prefix}cxt.bin")
     cxt_vectors = FloatTensor(
         FloatStorage.from_file(
-            f"{prefix}cxt.bin", shared=False, size=len(src_dataset) * 2 * 768))\
-        .reshape(len(src_dataset), 2, 768)
+            f"{prefix}cxt.bin", shared=False, size=len(src_dataset) * 3 * 768))\
+        .reshape(len(src_dataset), 3, 768)
 
     cxt = TensorDataset(cxt_vectors)
 

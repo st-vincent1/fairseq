@@ -94,6 +94,12 @@ def main(cfg: FairseqConfig) -> None:
             model = fsdp_wrap(task.build_model(cfg.model))
     else:
         model = task.build_model(cfg.model)
+
+    for name, param in model.named_parameters():
+        if 'cxt' not in name and 'decoder' not in name:
+            logging.info(f"Freezing{name}")
+            param.requires_grad=False
+
     criterion = task.build_criterion(cfg.criterion)
     logger.info(model)
     logger.info("task: {}".format(task.__class__.__name__))
