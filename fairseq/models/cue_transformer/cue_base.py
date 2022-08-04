@@ -304,6 +304,7 @@ class CUETransformer(CUETransformerBase):
         parser.add_argument('--context-just-embed', default=False, action='store_true',
                             help='if True, context vectors get embedded and skip past ContextEncoder')
         parser.add_argument('--cls-dim', default=768, help='dimension of CLS token input')
+        parser.add_argument('--context-average', default=False, action='store_true', help='average context or not')
 
     @classmethod
     def build_model(cls, args, task):
@@ -373,5 +374,6 @@ class CUETransformer(CUETransformerBase):
 def cue_transformer_base(args):
     args.context_inclusion = getattr(args, 'context_inclusion', 'add-encoder-outputs')
     args.context_just_embed = getattr(args, 'context_just_embed', False)
+    args.context_just_embed = getattr(args, 'context_average', False)
     args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 4)
     base_architecture(args)

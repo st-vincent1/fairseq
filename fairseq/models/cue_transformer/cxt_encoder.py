@@ -206,7 +206,7 @@ class ContextEncoderBase(FairseqEncoder):
                 x = self.layer_norm(x)
 
         # average outputs
-        x = torch.mean(x, dim=0)
+        # x = torch.mean(x, dim=0)
 
         return {
             "cxt_encoder_out": [x],  # T x B x C

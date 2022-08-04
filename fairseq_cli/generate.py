@@ -406,6 +406,7 @@ def cli_main():
     parser.add_argument('--context-just-embed', default=False, action='store_true',
                         help='if True, context vectors get embedded and skip past ContextEncoder')
     parser.add_argument('--cls-dim', default=768, help='dimension of CLS token input')
+    parser.add_argument('--context-average', default=False, action='store_true', help='average context or not')
     args = options.parse_args_and_arch(parser)
     main(args)
 

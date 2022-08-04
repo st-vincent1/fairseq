@@ -288,15 +288,23 @@ class ContextDecoderBase(FairseqIncrementalDecoder):
 
         if encoder_out is not None and len(encoder_out["encoder_out"]) > 0:
             if self.cfg.context_inclusion == 'cxt-src-concat':
-                enc = torch.cat((encoder_out["encoder_out"][0], encoder_out["cxt_encoder_out"][0].unsqueeze(0)))
-                encoder_out["src_lengths"][0] = torch.add(encoder_out["src_lengths"][0], 1)
+                if self.cfg.context_average:
+                    enc = torch.cat((encoder_out["encoder_out"][0], encoder_out["cxt_encoder_out"][0].unsqueeze(0)))
+                    encoder_out["src_lengths"][0] = torch.add(encoder_out["src_lengths"][0], 1)
+                else:
+                    enc = torch.cat((encoder_out["encoder_out"][0], encoder_out["cxt_encoder_out"][0]))
+                    encoder_out["src_lengths"][0] = torch.add(encoder_out["src_lengths"][0], 3)
             else: # context was inserted elsewhere
                 enc = encoder_out["encoder_out"][0]
 
         if encoder_out is not None and len(encoder_out["encoder_padding_mask"]) > 0:
             if self.cfg.context_inclusion == 'cxt-src-concat':
-                padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0],
-                                      torch.zeros_like(encoder_out["encoder_padding_mask"][0][:,:1])), dim=1)
+                if self.cfg.context_average:
+                    padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0],
+                                          torch.zeros_like(encoder_out["encoder_padding_mask"][0][:,:1])), dim=1)
+                else:
+                    padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0],
+                                              torch.zeros_like(encoder_out["encoder_padding_mask"][0][:, :1]).repeat(1,3)), dim=1)
             else: # context was inserted elsewhere
                 padding_mask = encoder_out["encoder_padding_mask"][0]
 
