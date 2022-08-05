@@ -146,6 +146,8 @@ def load_cue_dataset(
 @dataclass
 class CueConfig(TranslationConfig):
     """Copied config from Translation task. New arguments can be added below."""
+
+    """These arguments are identical as in CUE Config. This is to eliminate discrepancies between train and generate"""
     context_just_embed: bool = field(
         default=False, metadata={"help": "if true, just embed context, don't go through layers of encoder"}
     )
@@ -157,7 +159,7 @@ class CueConfig(TranslationConfig):
                         metadata={"help": 'average context or not'}
     )
     cls_dim: int = field(default=768, metadata={"help": 'dimension of CLS token input'})
-    # cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
+    cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
 
 
 @register_task("cue_translation", dataclass=CueConfig)

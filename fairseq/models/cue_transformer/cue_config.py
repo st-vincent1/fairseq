@@ -231,7 +231,21 @@ class CUEConfig(FairseqDataclass):
         metadata={"help": "don't add an extra layernorm after the last decoder block"},
     )
 
+    # ST Vincent custom parameters
+    context_just_embed: bool = field(
+        default=False, metadata={"help": "if true, just embed context, don't go through layers of encoder"}
+    )
+    context_inclusion: str = field(default='add-encoder-outputs',
+                                   metadata={"choices": ['cxt-src-concat', 'add-encoder-outputs', 'tag-enc',
+                                                         'replace-dec-bos'],
+                                             "help": 'how output from context encoder should be included'})
+    context_average: bool = field(default=False,
+                                  metadata={"help": 'average context or not'}
+                                  )
+    cls_dim: int = field(default=768, metadata={"help": 'dimension of CLS token input'})
     cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
+
+
     # We need to make this hierarchical dataclass like the flat namespace
     # __getattr__ and __setattr__ here allow backward compatibility
     # for subclasses of Transformer(Legacy) that depend on read/write on

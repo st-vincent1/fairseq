@@ -298,14 +298,6 @@ class CUETransformer(CUETransformerBase):
         gen_parser_from_dataclass(
             parser, CUEConfig(), delete_default=True, with_prefix=""
         )
-        # ST Vincent: Adding extra parameters
-        parser.add_argument('--context-inclusion', choices=['cxt-src-concat', 'add-encoder-outputs', 'tag-enc', 'replace-dec-bos'],
-                            default='add-encoder-outputs', help='how output from context encoder should be included')
-        parser.add_argument('--context-just-embed', default=False, action='store_true',
-                            help='if True, context vectors get embedded and skip past ContextEncoder')
-        parser.add_argument('--cls-dim', default=768, help='dimension of CLS token input')
-        parser.add_argument('--context-average', default=False, action='store_true', help='average context or not')
-        # parser.add_argument('--cls-context', default=False, action='store_true', help='use cls token for context')
 
     @classmethod
     def build_model(cls, args, task):
