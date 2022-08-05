@@ -350,7 +350,7 @@ class CUETransformer(CUETransformerBase):
                 args, "min_params_to_wrap", DEFAULT_MIN_PARAMS_TO_WRAP
             )
         cfg = CUEConfig.from_namespace(args)
-        if args.context_average and args.cls_context:
+        if cfg.context_average and cfg.cls_context:
             raise ValueError(
                 "--context-average and --cls-context cannot be activated together"
             )

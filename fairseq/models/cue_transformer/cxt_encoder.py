@@ -214,11 +214,11 @@ class ContextEncoderBase(FairseqEncoder):
 
         # average outputs
         if self.cfg.context_average:
-            x = torch.mean(x, dim=0)
+            x = torch.mean(x, dim=0).unsqueeze(0)
 
         if self.cfg.cls_context:
             # Take only the cls token as output
-            x = x[0,:,:]
+            x = x[0,:,:].unsqueeze(0)
         return {
             "cxt_encoder_out": [x],  # T x B x C
             "cxt_encoder_embedding": [cxt_encoder_embedding],  # B x T x C
