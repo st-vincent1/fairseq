@@ -288,7 +288,7 @@ class ContextDecoderBase(FairseqIncrementalDecoder):
 
         if encoder_out is not None and len(encoder_out["encoder_out"]) > 0:
             if self.cfg.context_inclusion == 'cxt-src-concat':
-                if self.cfg.context_average:
+                if self.cfg.context_average or self.cfg.cls_context:
                     enc = torch.cat((encoder_out["encoder_out"][0], encoder_out["cxt_encoder_out"][0].unsqueeze(0)))
                     encoder_out["src_lengths"][0] = torch.add(encoder_out["src_lengths"][0], 1)
                 else:
@@ -299,7 +299,7 @@ class ContextDecoderBase(FairseqIncrementalDecoder):
 
         if encoder_out is not None and len(encoder_out["encoder_padding_mask"]) > 0:
             if self.cfg.context_inclusion == 'cxt-src-concat':
-                if self.cfg.context_average:
+                if self.cfg.context_average or self.cfg.cls_context:
                     padding_mask = torch.cat((encoder_out["encoder_padding_mask"][0],
                                           torch.zeros_like(encoder_out["encoder_padding_mask"][0][:,:1])), dim=1)
                 else:

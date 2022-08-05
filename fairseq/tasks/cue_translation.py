@@ -22,6 +22,7 @@ from fairseq.tasks.translation import TranslationConfig, TranslationTask
 
 from torch.utils.data import TensorDataset
 from torch import FloatStorage, FloatTensor
+
 EVAL_BLEU_ORDER = 4
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ def load_cue_dataset(
     Args:
         src, tgt: lang codes
         """
+
     def split_exists(split, src, tgt, lang, data_path):
         filename = os.path.join(data_path, "{}.{}-{}.{}".format(split, src, tgt, lang))
         return indexed_dataset.dataset_exists(filename, impl=dataset_impl)
@@ -89,7 +91,7 @@ def load_cue_dataset(
     logging.info(f"--- Loading context from {prefix}cxt.bin")
     cxt_vectors = FloatTensor(
         FloatStorage.from_file(
-            f"{prefix}cxt.bin", shared=False, size=len(src_dataset) * 3 * 768))\
+            f"{prefix}cxt.bin", shared=False, size=len(src_dataset) * 3 * 768)) \
         .reshape(len(src_dataset), 3, 768)
 
     cxt = TensorDataset(cxt_vectors)
@@ -147,6 +149,15 @@ class CueConfig(TranslationConfig):
     context_just_embed: bool = field(
         default=False, metadata={"help": "if true, just embed context, don't go through layers of encoder"}
     )
+    context_inclusion: str = field(default='add-encoder-outputs',
+                                   metadata={"choices": ['cxt-src-concat', 'add-encoder-outputs', 'tag-enc',
+                                                         'replace-dec-bos'],
+                                             "help": 'how output from context encoder should be included'})
+    context_average: bool = field(default=False,
+                        metadata={"help": 'average context or not'}
+    )
+    cls_dim: int = field(default=768, metadata={"help": 'dimension of CLS token input'})
+    # cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
 
 
 @register_task("cue_translation", dataclass=CueConfig)

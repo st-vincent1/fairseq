@@ -63,11 +63,15 @@ class ContextEncoderBase(FairseqEncoder):
         self.return_fc = return_fc
 
         embed_dim = 512
-        self.padding_idx = 0
         self.max_source_positions = cfg.max_source_positions
 
         self.lin_proj = nn.Linear(cfg.cls_dim, embed_dim, bias=False)
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
+
+        # Generate CLS embedding
+        if self.cfg.cls_context:
+            self.cls = torch.nn.Parameter(torch.empty([1, embed_dim]))
+            torch.nn.init.xavier_uniform_(self.cls)
 
         if cfg.layernorm_embedding:
             self.layernorm_embedding = LayerNorm(embed_dim, export=cfg.export)
@@ -113,8 +117,11 @@ class ContextEncoderBase(FairseqEncoder):
 
     def forward_embedding(self, cls_embeddings):
         # pass embeddings through a linear projection layer
+        bsz = cls_embeddings.size(0)
         context_embedding = self.lin_proj(cls_embeddings)
         x = embed = self.embed_scale * context_embedding
+        if self.cfg.cls_context:
+            x = embed = torch.cat((self.cls.unsqueeze(0).repeat(bsz,1,1), x), dim=1)
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = self.dropout_module(x)
@@ -206,8 +213,12 @@ class ContextEncoderBase(FairseqEncoder):
                 x = self.layer_norm(x)
 
         # average outputs
-        # x = torch.mean(x, dim=0)
+        if self.cfg.context_average:
+            x = torch.mean(x, dim=0)
 
+        if self.cfg.cls_context:
+            # Take only the cls token as output
+            x = x[0,:,:]
         return {
             "cxt_encoder_out": [x],  # T x B x C
             "cxt_encoder_embedding": [cxt_encoder_embedding],  # B x T x C
@@ -231,7 +242,7 @@ class ContextEncoderBase(FairseqEncoder):
         if len(cxt_encoder_out["cxt_encoder_out"]) == 0:
             new_cxt_encoder_out = []
         else:
-            new_cxt_encoder_out = [cxt_encoder_out["cxt_encoder_out"][0].index_select(0, new_order)]
+            new_cxt_encoder_out = [cxt_encoder_out["cxt_encoder_out"][0].index_select(1, new_order)]
 
         if len(cxt_encoder_out["cxt_encoder_embedding"]) == 0:
             new_cxt_encoder_embedding = []
