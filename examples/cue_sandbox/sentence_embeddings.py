@@ -1,4 +1,5 @@
 import torch
+import psutil
 import transformers as ppb  # pytorch-transformers by huggingface
 import glob
 import os
@@ -8,9 +9,11 @@ from argparse import ArgumentParser
 import logging
 import itertools
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
 
-BSZ = 4096
+BSZ = 16384
 
 
 class ContextEmbedding:
@@ -38,17 +41,20 @@ class ContextEmbedding:
             raise FileNotFoundError
         logging.info(f"--- Scrapping data from {_dir} and saving to {out_filename}...")
 
+        bin_buff = None
         for file_idx, filepath in enumerate(_dir):
-            bin_buff = None
             # Read sentences from one context file
             with open(filepath) as f:
                 sentences = f.read().splitlines()
 
             # initialise float buffer if not done yet
             if bin_buff is None:
-                out_filename = os.path.join(input_dir, f"{prefix}_{file_idx}.bin")
-                bin_buff = initialise_buffer(out_filename, num_samples=len(sentences), num_contexts=1,
+                out_filename = os.path.join(input_dir, f"{prefix}.bin")
+                
+                logging.info(f"--- Initialising a buffer...")
+                bin_buff = initialise_buffer(out_filename, num_samples=len(sentences), num_contexts=len(_dir),
                                              embed_dim=768)
+                logging.info(f"--- Buffer initialised....")
 
             for i in tqdm(range(0, len(sentences), BSZ)):
                 encoded_input = self.tokenizer(sentences[i:i + BSZ],
@@ -69,7 +75,7 @@ class ContextEmbedding:
                         cls = cls.index_fill_(0, indices, 0)
                     except IndexError:  # no empty strings found
                         pass
-                bin_buff[i:i + BSZ, 0, :] = cls
+                bin_buff[i:i + BSZ, file_idx, :] = cls
 
         return len(sentences), len(_dir)
 
@@ -79,8 +85,9 @@ class ContextEmbedding:
             torch.FloatStorage.from_file(os.path.join(dirname, f"{prefix}.bin"), shared=True,
                                          size=data_len * num_contexts * embed_dim)) \
             .reshape(data_len, num_contexts, embed_dim)
-
-        for i in range(num_contexts):
+        logging.info("--- Opened new storage.")
+        for i in tqdm(range(num_contexts)):
+            logging.info("Loading old samples.")
             samples = torch.FloatTensor(
                 torch.FloatStorage.from_file(os.path.join(dirname, f"{prefix}_{i}.bin"), shared=False,
                                              size=data_len * 1 * 768)).reshape(
@@ -102,12 +109,13 @@ if __name__ == '__main__':
     parser.add_argument("--path", default="examples/cue_sandbox/data")
     args = parser.parse_args()
     x = ContextEmbedding()
-    for prefix in ['test', 'valid', 'dev', 'train', 'tst-COMMON']:
+    for prefix in ['test', 'valid', 'dev', 'tst-COMMON']:
+#    for prefix in ['train']:
         try:
             # Save contexts to individual files
             data_len, num_contexts = x.embeddings_to_float_storage(args.path, prefix=prefix)
-            x.combine_storages(args.path, prefix=prefix, data_len=data_len, num_contexts=num_contexts, embed_dim=768)
-            x.delete_partial_files(args.path, prefix=prefix)
+#            x.combine_storages(args.path, prefix=prefix, data_len=data_len, num_contexts=num_contexts, embed_dim=768)
+#            x.delete_partial_files(args.path, prefix=prefix)
         except FileNotFoundError:
             logging.warning(f"Not found {args.path}. Skipping")
             pass
