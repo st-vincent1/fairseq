@@ -820,7 +820,8 @@ def load_pretrained_component_from_model(
         raise IOError("Model file not found: {}".format(checkpoint))
     state = load_checkpoint_to_cpu(checkpoint)
     if isinstance(component, FairseqEncoder):
-        component_type = "encoder"
+        # temporary task-specific fix that really should be changed later on. todo
+        component_type = "src_encoder"
     elif isinstance(component, FairseqDecoder):
         component_type = "decoder"
     else:
