@@ -19,9 +19,11 @@ from .cue_base import (
     cue_no_layers,
     cue_cls_big,
     cue_average,
-    cue_pretrain
+    cue_pretrain,
+    cue_skip_concat
 )
 __all__ = [
+    "cue_skip_concat",
     "cue_concat",
     "cue_no_layers",
     "cue_cls_big",

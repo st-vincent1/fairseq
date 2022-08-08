@@ -162,7 +162,7 @@ class CueConfig(TranslationConfig):
     cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
     # cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
     pretrain_only: bool = field(default=False, metadata={"help": 'if true, freeze context encoder and only pretrain encoder/decoder on translation'})
-
+    skip_concat: bool = field(default=False, metadata={"help": 'add cxt embedding to cxt layer output'})
 @register_task("cue_translation", dataclass=CueConfig)
 class CueTranslationTask(TranslationTask):
     cfg: CueConfig

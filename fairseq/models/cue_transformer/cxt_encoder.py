@@ -213,6 +213,10 @@ class ContextEncoderBase(FairseqEncoder):
                 x = self.layer_norm(x)
 
         # average outputs
+        # Add embedding from skip connections
+        if self.cfg.skip_concat:
+            x += cxt_encoder_embedding.transpose(0, 1)
+
         if self.cfg.context_average:
             x = torch.mean(x, dim=0).unsqueeze(0)
 

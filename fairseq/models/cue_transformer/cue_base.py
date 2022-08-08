@@ -366,11 +366,13 @@ class CUETransformer(CUETransformerBase):
             CUEConfig.from_namespace(args), tgt_dict, embed_tokens
         )
 
+
 @register_model_architecture('cue_transformer', 'cue_concat')
 def cue_concat(args):
     args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
     args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 1)
     base_architecture(args)
+
 
 @register_model_architecture('cue_transformer', 'cue_no_layers')
 def cue_no_layers(args):
@@ -396,9 +398,20 @@ def cue_average(args):
     args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 1)
     base_architecture(args)
 
+
 @register_model_architecture('cue_transformer', 'cue_pretrain')
 def cue_pretrain(args):
     args.pretrain_only = getattr(args, 'pretrain_only', True)
     args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
     args.context_average = getattr(args, 'context_average', True)
+    base_architecture(args)
+
+
+@register_model_architecture('cue_transformer', 'cue_skip_concat')
+def cue_skip_concat(args):
+    args.pretrain_only = getattr(args, 'pretrain_only', True)
+    args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
+    # args.context_average = getattr(args, 'context_average', True)
+    args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 1)
+    args.skip_concat = getattr(args, 'skip_concat', True)
     base_architecture(args)
