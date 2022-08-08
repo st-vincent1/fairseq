@@ -160,7 +160,8 @@ class CueConfig(TranslationConfig):
     )
     cls_dim: int = field(default=768, metadata={"help": 'dimension of CLS token input'})
     cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
-
+    # cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
+    pretrain_only: bool = field(default=False, metadata={"help": 'if true, freeze context encoder and only pretrain encoder/decoder on translation'})
 
 @register_task("cue_translation", dataclass=CueConfig)
 class CueTranslationTask(TranslationTask):
