@@ -6,11 +6,15 @@ DATA=cue.en.pl
 
 SPM_MODEL=$ROOT/spm.bpe.model
 
-MODEL=cue.en.pl${SUFFIX}
 SUFFIX=$1
+MODEL=cue.en.pl${SUFFIX}
+
 CKPT=${2:-'checkpoint_best'}
+
 ARGS=${@:3}
+
 mkdir -p logs
+
 TMP=examples/cue_sandbox/en-pl/tmp${SUFFIX}
 mkdir -p $TMP
 
@@ -37,7 +41,7 @@ fairseq-generate data-bin/${DATA} \
     --path checkpoints/${MODEL}/${CKPT}.pt \
     --batch-size 128 \
     --remove-bpe=sentencepiece \
-    --context-inclusion cxt-src-concat ${ARGS} --cpu > ${TMP}/test.sys 
+    --context-inclusion cxt-src-concat ${ARGS} > ${TMP}/test.sys 
 
 grep ^H ${TMP}/test.sys | LC_ALL=C sort -V | cut -f3- > ${TMP}/test.hyp
 

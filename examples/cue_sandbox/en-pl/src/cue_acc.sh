@@ -6,17 +6,11 @@ DATA=cue.en.pl
 
 SPM_MODEL=$ROOT/spm.bpe.model
 
-BLOCK_CXT_ENCODER=$1
-SUFFIX=$2
-MODEL=cue.en.pl${SUFFIX}
-CKPT=${3:-'checkpoint_best'}
+SUFFIX=$1
 mkdir -p logs
 TMP=examples/cue_sandbox/en-pl/tmp${SUFFIX}
 mkdir -p $TMP
 
-if [ ${BLOCK_CXT_ENCODER} == true ]; then
-  EXTRA_ARGS=(--context-just-embed)
-fi
 
 
 python ${ROOT}/annotation_tool/annotate.py --src ${ROOT}/data/en-pl.test.en --mark ${ROOT}/data/en-pl.test.bpe.marking \
