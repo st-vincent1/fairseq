@@ -1,18 +1,17 @@
 #!/bin/bash
 set -e
 SEED=1
-SUFFIX=.pretrain
+SUFFIX=.pretrain.1cxt
 mkdir -p logs
 CKPT=checkpoints/cue.en.pl${SUFFIX}
 echo $ARGS
 mkdir -p ${CKPT}
 # currently lr must be in ARGS
 CUDA_VISIBLE_DEVICES=0,1 fairseq-train data-bin/cue.en.pl/ \
-    --pretrain-only \
-    --max-update 200000 \
+    --max-update 100000 \
     --ddp-backend=legacy_ddp \
     --task cue_translation \
-    --arch cue_transformer_base \
+    --arch cue_pretrain \
     --share-all-embeddings \
     --optimizer adam --adam-betas '(0.9, 0.98)' \
     --lr-scheduler inverse_sqrt \
@@ -25,6 +24,7 @@ CUDA_VISIBLE_DEVICES=0,1 fairseq-train data-bin/cue.en.pl/ \
     --memory-efficient-fp16 \
     --tensorboard-logdir logs \
     --seed ${SEED} \
-    --lr 0.0005
+    --lr 0.0005 \
+    --cxt-encoder-layers 1
 
 # removed save interval checkpoints

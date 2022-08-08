@@ -15,12 +15,14 @@ from .cxt_encoder import ContextEncoderBase
 from .cxt_decoder import ContextDecoderBase
 
 from .cue_base import (
+    cue_concat,
     cue_no_layers,
     cue_cls_big,
     cue_average,
     cue_pretrain
 )
 __all__ = [
+    "cue_concat",
     "cue_no_layers",
     "cue_cls_big",
     "cue_average",

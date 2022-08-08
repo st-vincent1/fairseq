@@ -100,6 +100,12 @@ def main(cfg: FairseqConfig) -> None:
             if 'cxt' in name:
                 logging.info(f"Freezing {name}")
                 param.requires_grad=False
+#    else:
+#        for name, param in model.named_parameters():
+#            if 'src' in name:
+#                logging.info(f"Freezing {name}")
+#                param.requires_grad=False
+        
 
     criterion = task.build_criterion(cfg.criterion)
     logger.info(model)
