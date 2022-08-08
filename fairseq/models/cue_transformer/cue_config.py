@@ -245,6 +245,7 @@ class CUEConfig(FairseqDataclass):
     cls_dim: int = field(default=768, metadata={"help": 'dimension of CLS token input'})
     cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
     pretrain_only: bool = field(default=False, metadata={"help": 'if true, freeze context encoder and only pretrain encoder/decoder on translation'})
+
     # We need to make this hierarchical dataclass like the flat namespace
     # __getattr__ and __setattr__ here allow backward compatibility
     # for subclasses of Transformer(Legacy) that depend on read/write on

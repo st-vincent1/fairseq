@@ -250,8 +250,8 @@ class CUETransformerBase(DoubleEncoderDecoderModel):
             return_all_hiddens=return_all_hiddens
         )
         # if self.cfg.context_inclusion == 'add-encoder-outputs':
-            # currently only supported option; adds cxt vectors to each encoder output position wise
-            # src_encoder_out['encoder_out'] += cxt_encoder_out['cxt_encoder_out']
+        # currently only supported option; adds cxt vectors to each encoder output position wise
+        # src_encoder_out['encoder_out'] += cxt_encoder_out['cxt_encoder_out']
 
         encoder_out = src_encoder_out | cxt_encoder_out
 
@@ -367,11 +367,30 @@ class CUETransformer(CUETransformerBase):
         )
 
 
-@register_model_architecture('cue_transformer', 'cue_transformer_base')
-def cue_transformer_base(args):
-    args.context_inclusion = getattr(args, 'context_inclusion', 'add-encoder-outputs')
-    args.context_just_embed = getattr(args, 'context_just_embed', False)
-    args.context_just_embed = getattr(args, 'context_average', False)
-    args.context_just_embed = getattr(args, 'cls_context', False)
-    args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 6)
+@register_model_architecture('cue_transformer', 'cue_no_layers')
+def cue_no_layers(args):
+    args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
+    args.context_just_embed = getattr(args, 'context_just_embed', True)
+    args.context_average = getattr(args, 'context_average', True)
+    base_architecture(args)
+
+
+@register_model_architecture('cue_transformer', 'cue_cls_big')
+def cue_cls_big(args):
+    args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
+    args.cls_context = getattr(args, 'cls_context', True)
+    base_architecture(args)
+
+
+@register_model_architecture('cue_transformer', 'cue_average')
+def cue_average(args):
+    args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
+    args.context_average = getattr(args, 'context_average', True)
+    base_architecture(args)
+
+@register_model_architecture('cue_transformer', 'cue_pretrain')
+def cue_pretrain(args):
+    args.pretrain_only = getattr(args, 'pretrain_only', True)
+    args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
+    args.context_average = getattr(args, 'context_average', True)
     base_architecture(args)
