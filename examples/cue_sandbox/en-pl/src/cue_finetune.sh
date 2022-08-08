@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=0,1 fairseq-train data-bin/cue.en.pl/ \
     --optimizer adam --adam-betas '(0.9, 0.98)' \
     --lr-scheduler inverse_sqrt \
     --warmup-updates 4000 --warmup-init-lr '1e-07' \
-    --label-smoothing 0.1 --criterion label_smoothed_cross_entropy \
+    --label-smoothing 0.0 --criterion label_smoothed_cross_entropy \
     --dropout 0.0 --weight-decay 0.0001 \
     --no-epoch-checkpoints \
     --save-dir ${CKPT} \
@@ -26,6 +26,6 @@ CUDA_VISIBLE_DEVICES=0,1 fairseq-train data-bin/cue.en.pl/ \
     --memory-efficient-fp16 \
     --tensorboard-logdir logs \
     --seed ${SEED} \
-    --lr 0.0003
+    --lr 0.0001
 
 # removed save interval checkpoints
