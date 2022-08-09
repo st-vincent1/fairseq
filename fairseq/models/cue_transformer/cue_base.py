@@ -409,7 +409,6 @@ def cue_pretrain(args):
 
 @register_model_architecture('cue_transformer', 'cue_skip_concat')
 def cue_skip_concat(args):
-    args.pretrain_only = getattr(args, 'pretrain_only', True)
     args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
     # args.context_average = getattr(args, 'context_average', True)
     args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 1)
