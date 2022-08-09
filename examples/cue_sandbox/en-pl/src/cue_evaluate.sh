@@ -40,8 +40,8 @@ elif [ ${ARCH} == cue_cls_big ]; then
     ARGS="--cls-context" 
 elif [ ${ARCH} == cue_average ]; then
     ARGS="--context-average" 
-elif [ ${ARCH} == cue_concat ]; then
-#    ARGS="--context-concat"
+elif [ ${ARCH} == cue_skip_concat ]; then
+    ARGS="--skip-concat"
     echo ""
 fi
 
