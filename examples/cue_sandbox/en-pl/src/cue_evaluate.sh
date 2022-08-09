@@ -34,23 +34,11 @@ mkdir -p $TMP
 #
 #rm -r ${TMP}
 
-if [ ${ARCH} == cue_no_layers ]; then
-    ARGS="--context-just-embed"
-elif [ ${ARCH} == cue_cls_big ]; then
-    ARGS="--cls-context" 
-elif [ ${ARCH} == cue_average ]; then
-    ARGS="--context-average" 
-elif [ ${ARCH} == cue_skip_concat ]; then
-    ARGS="--skip-concat"
-    echo ""
-fi
-
 fairseq-generate data-bin/${DATA} \
     --task cue_translation --source-lang en --target-lang pl \
-    --path checkpoints/${MODEL}_with_drop/${CKPT}.pt \
+    --path checkpoints/${MODEL}/${CKPT}.pt \
     --batch-size 128 \
-    --remove-bpe=sentencepiece \
-    --context-inclusion cxt-src-concat ${ARGS} > ${TMP}/test.sys 
+    --remove-bpe=sentencepiece > ${TMP}/test.sys 
 
 grep ^H ${TMP}/test.sys | LC_ALL=C sort -V | cut -f3- > ${TMP}/test.hyp
 

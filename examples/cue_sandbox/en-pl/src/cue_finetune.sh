@@ -9,7 +9,7 @@ echo $ARGS
 mkdir -p ${CKPT}
 # currently lr must be in ARGS
 CUDA_VISIBLE_DEVICES=0,1 fairseq-train data-bin/cue.en.pl/ \
-    --finetune-from-model checkpoints/cue.en.pl.pretrain.1cxt/checkpoint_best.pt \
+    --finetune-from-model checkpoints/cue.en.pl.pretrain/checkpoint_best.pt \
     --max-update 50000 \
     --ddp-backend=legacy_ddp \
     --task cue_translation \

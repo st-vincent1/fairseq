@@ -324,7 +324,7 @@ class ContextEncoderLayerBase(nn.Module):
             x = self.self_attn_layer_norm(x)
 
         residual = x
-        return residual
+        #return residual
 
         if self.normalize_before:
             x = self.final_layer_norm(x)
@@ -338,7 +338,7 @@ class ContextEncoderLayerBase(nn.Module):
         x = self.residual_connection(x, residual)
         if not self.normalize_before:
             x = self.final_layer_norm(x)
-
+        
         if self.return_fc and not torch.jit.is_scripting():
             return x, fc_result
         return x
