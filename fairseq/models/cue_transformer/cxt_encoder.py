@@ -19,7 +19,7 @@ from torch import Tensor
 from fairseq import utils
 from fairseq.distributed import fsdp_wrap
 from fairseq.models import FairseqEncoder
-from fairseq.models.cue_transformer import CUEConfig
+from fairseq.models.cue_transformer import CUEConfig, context_layer
 from fairseq.modules import (
     FairseqDropout,
     LayerDropModuleList,
@@ -101,8 +101,9 @@ class ContextEncoderBase(FairseqEncoder):
         else:
             self.layer_norm = None
 
+
     def build_cxt_encoder_layer(self, cfg):
-        layer = transformer_layer.TransformerEncoderLayerBase(
+        layer = context_layer.ContextEncoderLayerBase(
             cfg, return_fc=self.return_fc
         )
         checkpoint = cfg.checkpoint_activations
