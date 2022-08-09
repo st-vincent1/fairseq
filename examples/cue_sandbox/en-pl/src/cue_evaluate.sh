@@ -47,7 +47,7 @@ fi
 
 fairseq-generate data-bin/${DATA} \
     --task cue_translation --source-lang en --target-lang pl \
-    --path checkpoints/${MODEL}/${CKPT}.pt \
+    --path checkpoints/${MODEL}_with_drop/${CKPT}.pt \
     --batch-size 128 \
     --remove-bpe=sentencepiece \
     --context-inclusion cxt-src-concat ${ARGS} > ${TMP}/test.sys 
