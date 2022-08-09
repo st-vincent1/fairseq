@@ -94,9 +94,7 @@ def load_cue_dataset(
             f"{prefix}cxt.bin", shared=False, size=len(src_dataset) * 3 * 768)) \
         .reshape(len(src_dataset), 3, 768)
 
-    # Adding random vectors to check
-    cxt = TensorDataset(randn([len(src_dataset), 3, 768]))
-    # cxt = TensorDataset(cxt_vectors)
+    cxt = TensorDataset(cxt_vectors)
 
     if prepend_bos:
         assert hasattr(src_dict, "bos_index") and hasattr(tgt_dict, "bos_index")
