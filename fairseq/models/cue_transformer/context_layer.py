@@ -302,84 +302,46 @@ class ContextEncoderLayerBase(nn.Module):
         # the attention weight (before softmax) for some padded element in query
         # will become -inf, which results in NaN in model parameters
 
-        if self.training:
-            self.ever_training = True
-
-        if (
-            self.BT_version
-            and x.dim() == 3
-            and self.load_to_BT
-            and not self.return_fc
-            and self.can_use_fastpath
-            and not self.training
-            and not self.ever_training
-            and not self.cfg_checkpoint_activations
-        ):
-            # assume is Batch first and nested tensor
-            output = torch._transformer_encoder_layer_fwd(
-                x,
-                self.embed_dim,
-                self.num_heads,
-                self.in_proj_weight,
-                self.in_proj_bias,
-                self.out_proj_weight,
-                self.out_proj_bias,
-                self.activation_relu_or_gelu == 2,
-                False,  # norm_first, currently not supported
-                self.self_attn_layer_norm.eps,
-                self.self_attn_layer_norm.weight,
-                self.self_attn_layer_norm.bias,
-                self.final_layer_norm.weight,
-                self.final_layer_norm.bias,
-                self.fc1_weight,
-                self.fc1_bias,
-                self.fc2_weight,
-                self.fc2_bias,
-                encoder_padding_mask if encoder_padding_mask is not None else attn_mask,
+        if attn_mask is not None:
+            attn_mask = attn_mask.masked_fill(
+                attn_mask.to(torch.bool), -1e8 if x.dtype == torch.float32 else -1e4
             )
-            return output
 
-        else:
-            if attn_mask is not None:
-                attn_mask = attn_mask.masked_fill(
-                    attn_mask.to(torch.bool), -1e8 if x.dtype == torch.float32 else -1e4
-                )
+        residual = x
+        if self.normalize_before:
+            x = self.self_attn_layer_norm(x)
+        x, attn = self.self_attn(
+            query=x,
+            key=x,
+            value=x,
+            key_padding_mask=encoder_padding_mask,
+            need_weights=True,
+            attn_mask=attn_mask,
+        )
+        x = self.dropout_module(x)
+        x = self.residual_connection(x, residual)
+        if not self.normalize_before:
+            x = self.self_attn_layer_norm(x)
 
-            residual = x
-            if self.normalize_before:
-                x = self.self_attn_layer_norm(x)
-            x, _ = self.self_attn(
-                query=x,
-                key=x,
-                value=x,
-                key_padding_mask=encoder_padding_mask,
-                need_weights=False,
-                attn_mask=attn_mask,
-            )
-            x = self.dropout_module(x)
-            x = self.residual_connection(x, residual)
-            if not self.normalize_before:
-                x = self.self_attn_layer_norm(x)
+        residual = x
+        return residual
 
-            residual = x
-            return residual
+        if self.normalize_before:
+            x = self.final_layer_norm(x)
+        x = self.activation_fn(self.fc1(x))
+        x = self.activation_dropout_module(x)
+        x = self.fc2(x)
 
-            if self.normalize_before:
-                x = self.final_layer_norm(x)
-            x = self.activation_fn(self.fc1(x))
-            x = self.activation_dropout_module(x)
-            x = self.fc2(x)
+        fc_result = x
 
-            fc_result = x
+        x = self.dropout_module(x)
+        x = self.residual_connection(x, residual)
+        if not self.normalize_before:
+            x = self.final_layer_norm(x)
 
-            x = self.dropout_module(x)
-            x = self.residual_connection(x, residual)
-            if not self.normalize_before:
-                x = self.final_layer_norm(x)
-
-            if self.return_fc and not torch.jit.is_scripting():
-                return x, fc_result
-            return x
+        if self.return_fc and not torch.jit.is_scripting():
+            return x, fc_result
+        return x
 
 # backward compatible with the legacy argparse format
 class ContextEncoderLayer(ContextEncoderLayerBase):

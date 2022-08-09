@@ -414,3 +414,8 @@ def cue_skip_concat(args):
     args.cxt_encoder_layers = getattr(args, 'cxt_encoder_layers', 1)
     args.skip_concat = getattr(args, 'skip_concat', True)
     base_architecture(args)
+
+@register_model_architecture('cue_transformer', 'cue_transformer_base')
+def cue_transformer_base(args):
+    args.context_inclusion = getattr(args, 'context_inclusion', 'cxt-src-concat')
+    base_architecture(args)
