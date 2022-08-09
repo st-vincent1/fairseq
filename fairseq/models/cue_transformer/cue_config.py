@@ -99,7 +99,8 @@ class CUEConfig(FairseqDataclass):
         default="relu",
         metadata={"help": "activation function to use"},
     )
-    dropout: float = field(default=0.1, metadata={"help": "dropout probability"})
+    dropout: float = field(default=0.3, metadata={"help": "dropout probability"})
+    context_dropout: float = field(default=0.0, metadata={"help": "dropout probability for context"})
     attention_dropout: float = field(
         default=0.0, metadata={"help": "dropout probability for attention weights"}
     )

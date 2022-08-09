@@ -57,7 +57,7 @@ class ContextEncoderBase(FairseqEncoder):
         self.register_buffer("version", torch.Tensor([3]))
 
         self.dropout_module = FairseqDropout(
-            cfg.dropout, module_name=module_name_fordropout(self.__class__.__name__)
+            cfg.context_dropout, module_name=module_name_fordropout(self.__class__.__name__)
         )
         self.cxt_encoder_layerdrop = cfg.cxt_encoder.layerdrop
         self.return_fc = return_fc

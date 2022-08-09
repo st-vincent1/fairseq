@@ -21,7 +21,7 @@ from fairseq.tasks import register_task
 from fairseq.tasks.translation import TranslationConfig, TranslationTask
 
 from torch.utils.data import TensorDataset
-from torch import FloatStorage, FloatTensor
+from torch import FloatStorage, FloatTensor, randn
 
 EVAL_BLEU_ORDER = 4
 
@@ -94,7 +94,9 @@ def load_cue_dataset(
             f"{prefix}cxt.bin", shared=False, size=len(src_dataset) * 3 * 768)) \
         .reshape(len(src_dataset), 3, 768)
 
-    cxt = TensorDataset(cxt_vectors)
+    # Adding random vectors to check
+    cxt = TensorDataset(randn([len(src_dataset), 3, 768]))
+    # cxt = TensorDataset(cxt_vectors)
 
     if prepend_bos:
         assert hasattr(src_dict, "bos_index") and hasattr(tgt_dict, "bos_index")
@@ -163,6 +165,7 @@ class CueConfig(TranslationConfig):
     # cls_context: bool = field(default=False, metadata={"help": 'use cls token for context'})
     pretrain_only: bool = field(default=False, metadata={"help": 'if true, freeze context encoder and only pretrain encoder/decoder on translation'})
     skip_concat: bool = field(default=False, metadata={"help": 'add cxt embedding to cxt layer output'})
+
 @register_task("cue_translation", dataclass=CueConfig)
 class CueTranslationTask(TranslationTask):
     cfg: CueConfig
